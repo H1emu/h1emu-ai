@@ -279,6 +279,7 @@ dependencies = [
  "bevy_ecs",
  "js-sys",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

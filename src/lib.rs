@@ -1,11 +1,19 @@
 use core::panic;
 use std::sync::{
     atomic::{AtomicPtr, Ordering},
-    Arc, Mutex,
+    Arc,
 };
 
 use bevy_ecs::prelude::*;
 use wasm_bindgen::prelude::*;
+use web_sys::console;
+
+macro_rules! log {
+    ($($t:tt)*) => {
+        console::log_1(&format!("{}",$($t)*).into())
+    };
+}
+
 #[derive(Component)]
 struct Position(Vec<f32>);
 
@@ -18,7 +26,7 @@ struct PlayerEntity();
 #[derive(Component)]
 struct DeerEntity();
 
-#[derive(Component)]
+#[derive(Bundle)]
 struct EntityDefaultBundle {
     h1emu_id: H1emuId,
     position: Position,
@@ -32,9 +40,7 @@ struct Velocity(Vec<f32>);
 struct CB(Arc<AtomicPtr<js_sys::Function>>);
 
 impl CB {
-    // Safely call the JavaScript function stored in the AtomicPtr
     fn call_js_function(&self, arg: &JsValue) {
-        panic!("fuck");
         // Load the raw pointer
         let ptr = self.0.load(Ordering::SeqCst);
 
@@ -42,24 +48,27 @@ impl CB {
         if !ptr.is_null() {
             // Convert the raw pointer to a reference
             unsafe {
-                let js_func: &js_sys::Function = &*ptr;
-                // Call the JavaScript function
-                js_func.call1(&JsValue::NULL, arg).unwrap();
+                let func = &*ptr;
+
+                // Ensure the conversion is valid
+                if func.is_function() {
+                    log!("Function detected.");
+
+                    // Call the JavaScript function
+                    func.call1(&JsValue::NULL, arg).unwrap();
+                } else {
+                    log!("The stored value is not a function.");
+                }
             }
         } else {
-            panic!("fuck")
+            panic!("Null pointer encountered.");
         }
     }
 }
 
-// This system moves each entity with a Position and Velocity component
 fn movement(mut query: Query<&CB>) {
-    // ZEBI pk la query est viiiide
-    query.get_single().unwrap();
-
     for cb in &mut query {
-        panic!("fuck");
-        cb.call_js_function(&JsValue::from_str(&"hey"))
+        cb.call_js_function(&JsValue::from_str(&"test"))
     }
 }
 #[wasm_bindgen]
@@ -116,11 +125,13 @@ impl AiManager {
         self.schedule.run(&mut self.world);
     }
     pub fn add_entity(&mut self, mut e: EntityFromJs) {
+        let action_cb = Box::into_raw(Box::new(e.action_cb));
+        let action_cb_ptr = Arc::new(AtomicPtr::new(action_cb));
         let mut entity = self.world.spawn(EntityDefaultBundle {
             h1emu_id: H1emuId(e.h1emu_id),
             position: Position(e.position),
             velocity: Velocity(e.velocity),
-            cb: CB(Arc::new(AtomicPtr::new(&mut e.action_cb))),
+            cb: CB(action_cb_ptr),
         });
         match e.entity_type {
             EntityType::Player => entity.insert(PlayerEntity {}),
