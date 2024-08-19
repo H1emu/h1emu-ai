@@ -5,7 +5,7 @@ use std::sync::{
 };
 
 use bevy_ecs::prelude::*;
-use js_sys::{Function, Object, Reflect};
+use js_sys::{Array, Function, Object, Reflect};
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
@@ -16,13 +16,10 @@ macro_rules! log {
 }
 
 #[derive(Component)]
-struct Position(Vec<f32>);
-
-#[derive(Component)]
 struct H1emuEntity(Arc<AtomicPtr<js_sys::Object>>);
 
 impl H1emuEntity {
-    fn call_method(&self, arg: &JsValue) {
+    fn get_object(&self) -> Result<&Object, ()> {
         // Load the raw pointer
         let ptr = self.0.load(Ordering::SeqCst);
 
@@ -34,19 +31,51 @@ impl H1emuEntity {
 
                 // Ensure the conversion is valid
                 if obj.is_object() {
-                    let func: Function = Function::from(Reflect::get(&obj, &arg).unwrap());
-                    if func.is_function() {
-                        let args = js_sys::Array::new();
-                        func.apply(obj, &args).unwrap();
-                    } else {
-                        log!("specified method doesn't exist")
-                    }
+                    return Ok(obj);
                 } else {
                     log!("The stored value is not an object.");
+                    Err(())
                 }
             }
         } else {
             panic!("Null pointer encountered.");
+        }
+    }
+    fn get_position(&self) -> JsValue {
+        let position_js_value = self
+            .get_property(vec![
+                &JsValue::from_str("state"),
+                &JsValue::from_str("position"),
+            ])
+            .unwrap();
+
+        return position_js_value;
+    }
+    fn get_property(&self, property_chain: Vec<&JsValue>) -> Result<JsValue, ()> {
+        let mut current_obj = self.get_object().unwrap().to_owned();
+        for property in property_chain {
+            let property = Reflect::get(&current_obj, &property).unwrap();
+            if property.is_undefined() {
+                log!("specified property doesn't exist");
+                break;
+                // Err(())
+            } else {
+                current_obj = Object::from(property);
+            }
+        }
+        if !current_obj.is_undefined() {
+            Ok(JsValue::from(current_obj))
+        } else {
+            Err(())
+        }
+    }
+    fn call_method(&self, method: &JsValue, args: &Array) {
+        let obj = self.get_object().unwrap();
+        let func: Function = Function::from(Reflect::get(&obj, &method).unwrap());
+        if func.is_function() {
+            func.apply(obj, &args).unwrap();
+        } else {
+            log!("specified method doesn't exist")
         }
     }
 }
@@ -59,51 +88,21 @@ struct DeerEntity();
 
 #[derive(Bundle)]
 struct EntityDefaultBundle {
-    h1emu_id: H1emuEntity,
-    position: Position,
-    velocity: Velocity,
-    cb: CB,
+    h1emu_entity: H1emuEntity,
 }
-#[derive(Component)]
-struct Velocity(Vec<f32>);
 
-#[derive(Component)]
-struct CB(Arc<AtomicPtr<js_sys::Function>>);
-
-impl CB {
-    fn call_js_function(&self, arg: &JsValue) {
-        // Load the raw pointer
-        let ptr = self.0.load(Ordering::SeqCst);
-
-        // Check if the pointer is null
-        if !ptr.is_null() {
-            // Convert the raw pointer to a reference
-            unsafe {
-                let func = &*ptr;
-
-                // Ensure the conversion is valid
-                if func.is_function() {
-                    // Call the JavaScript function
-                    func.call1(&JsValue::NULL, arg).unwrap();
-                } else {
-                    log!("The stored value is not a function.");
-                }
-            }
-        } else {
-            panic!("Null pointer encountered.");
+fn test_follow(
+    mut zombie_query: Query<&H1emuEntity, With<ZombieEntity>>,
+    mut player_query: Query<&H1emuEntity, With<PlayerEntity>>,
+) {
+    let method = &JsValue::from_str(&"goTo");
+    for obj in &mut zombie_query {
+        for player in &mut player_query {
+            let pos = player.get_position();
+            let args = js_sys::Array::new();
+            args.push(&pos);
+            obj.call_method(method, &args);
         }
-    }
-}
-
-fn test_cb(mut query: Query<&CB>) {
-    for cb in &mut query {
-        cb.call_js_function(&JsValue::from_str(&"test"))
-    }
-}
-fn test_obj(mut query: Query<&H1emuEntity>) {
-    for obj in &mut query {
-        let method = &JsValue::from_str(&"hurle");
-        obj.call_method(method);
     }
 }
 #[wasm_bindgen]
@@ -115,26 +114,14 @@ pub struct AiManager {
 pub struct EntityFromJs {
     h1emu_id: js_sys::Object,
     entity_type: EntityType,
-    position: Vec<f32>,
-    velocity: Vec<f32>,
-    action_cb: js_sys::Function,
 }
 #[wasm_bindgen]
 impl EntityFromJs {
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        entity_type: EntityType,
-        position: Vec<f32>,
-        velocity: Vec<f32>,
-        action_cb: js_sys::Function,
-        h1emu_id: js_sys::Object,
-    ) -> EntityFromJs {
+    pub fn new(entity_type: EntityType, h1emu_id: js_sys::Object) -> EntityFromJs {
         EntityFromJs {
             h1emu_id,
             entity_type,
-            position,
-            velocity,
-            action_cb,
         }
     }
 }
@@ -151,8 +138,7 @@ impl AiManager {
     pub fn initialize() -> AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
-        schedule.add_systems(test_cb);
-        schedule.add_systems(test_obj);
+        schedule.add_systems(test_follow);
 
         AiManager { world, schedule }
     }
@@ -160,16 +146,11 @@ impl AiManager {
     pub fn run(&mut self) {
         self.schedule.run(&mut self.world);
     }
-    pub fn add_entity(&mut self, mut e: EntityFromJs) {
-        let action_cb = Box::into_raw(Box::new(e.action_cb));
-        let action_cb_ptr = Arc::new(AtomicPtr::new(action_cb));
+    pub fn add_entity(&mut self, e: EntityFromJs) {
         let h1emu_entity = Box::into_raw(Box::new(e.h1emu_id));
         let h1emu_entity_ptr = Arc::new(AtomicPtr::new(h1emu_entity));
         let mut entity = self.world.spawn(EntityDefaultBundle {
-            h1emu_id: H1emuEntity(h1emu_entity_ptr),
-            position: Position(e.position),
-            velocity: Velocity(e.velocity),
-            cb: CB(action_cb_ptr),
+            h1emu_entity: H1emuEntity(h1emu_entity_ptr),
         });
         match e.entity_type {
             EntityType::Player => entity.insert(PlayerEntity {}),
