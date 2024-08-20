@@ -134,7 +134,7 @@ fn track_players_pos(mut player_query: Query<(&H1emuEntity, &mut Position), With
         player_position.x = pos.x;
         player_position.y = pos.y;
         player_position.z = pos.z;
-        log!(player_position);
+        // log!(player_position);
     }
 }
 #[wasm_bindgen]
@@ -165,6 +165,12 @@ pub enum EntityType {
 }
 
 #[wasm_bindgen]
+pub struct Stats {
+    pub zombies: u32,
+    pub players: u32,
+}
+
+#[wasm_bindgen]
 impl AiManager {
     #[wasm_bindgen(constructor)]
     pub fn initialize() -> AiManager {
@@ -174,6 +180,10 @@ impl AiManager {
         schedule.add_systems(track_players_pos);
 
         AiManager { world, schedule }
+    }
+
+    pub fn get_stats(&mut self) -> Stats {
+        todo!()
     }
 
     pub fn run(&mut self) {
