@@ -1,13 +1,21 @@
 use core::panic;
-use std::sync::{
-    atomic::{AtomicPtr, Ordering},
-    Arc,
+use std::{
+    io::Cursor,
+    sync::{
+        atomic::{AtomicPtr, Ordering},
+        Arc,
+    },
 };
 
 use bevy_ecs::prelude::*;
+use binrw::BinReaderExt;
+use chunck_schemas::ChunkData;
 use js_sys::{Array, Float32Array, Function, Object, Reflect};
+use lz4_flex::decompress_size_prepended;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
+
+mod chunck_schemas;
 
 macro_rules! log {
     ($($t:tt)*) => {
@@ -138,11 +146,6 @@ fn track_players_pos(mut player_query: Query<(&H1emuEntity, &mut Position), With
     }
 }
 #[wasm_bindgen]
-pub struct AiManager {
-    world: World,
-    schedule: Schedule,
-}
-#[wasm_bindgen]
 pub struct EntityFromJs {
     h1emu_id: js_sys::Object,
     entity_type: EntityType,
@@ -171,15 +174,33 @@ pub struct Stats {
 }
 
 #[wasm_bindgen]
+pub struct AiManager {
+    world: World,
+    schedule: Schedule,
+    chunck_data: ChunkData,
+}
+#[wasm_bindgen]
 impl AiManager {
     #[wasm_bindgen(constructor)]
-    pub fn initialize() -> AiManager {
+    pub fn initialize(nav_data_compressed: &[u8]) -> AiManager {
+        log!("Start reading nav_data");
+        let nav_data_uncompressed = decompress_size_prepended(&nav_data_compressed).unwrap();
+
+        let nav_data: ChunkData = Cursor::new(nav_data_uncompressed).read_le().unwrap();
+        log!("Finish reading nav_data");
+
         let world = World::new();
         let mut schedule = Schedule::default();
         schedule.add_systems(test_follow);
         schedule.add_systems(track_players_pos);
 
-        AiManager { world, schedule }
+        log!("Ai manager Ready!");
+        log!(nav_data.chunck_count);
+        AiManager {
+            world,
+            schedule,
+            chunck_data: nav_data,
+        }
     }
 
     pub fn get_stats(&mut self) -> Stats {
