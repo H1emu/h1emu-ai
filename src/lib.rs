@@ -145,6 +145,16 @@ fn track_players_pos(mut player_query: Query<(&H1emuEntity, &mut Position), With
         // log!(player_position);
     }
 }
+
+fn get_player_polygon(
+    mut player_query: Query<&Position, With<PlayerEntity>>,
+    nav_data: Res<NavData>,
+) {
+    for player_position in &mut player_query {
+        log!(player_position);
+        todo!()
+    }
+}
 #[wasm_bindgen]
 pub struct EntityFromJs {
     h1emu_id: js_sys::Object,
@@ -177,8 +187,10 @@ pub struct Stats {
 pub struct AiManager {
     world: World,
     schedule: Schedule,
-    chunck_data: ChunkData,
 }
+
+#[derive(Resource)]
+struct NavData(ChunkData);
 #[wasm_bindgen]
 impl AiManager {
     #[wasm_bindgen(constructor)]
@@ -186,21 +198,18 @@ impl AiManager {
         log!("Start reading nav_data");
         let nav_data_uncompressed = decompress_size_prepended(&nav_data_compressed).unwrap();
 
-        let nav_data: ChunkData = Cursor::new(nav_data_uncompressed).read_le().unwrap();
+        let nav_data: NavData = NavData(Cursor::new(nav_data_uncompressed).read_le().unwrap());
         log!("Finish reading nav_data");
 
-        let world = World::new();
+        let mut world = World::new();
         let mut schedule = Schedule::default();
         schedule.add_systems(test_follow);
         schedule.add_systems(track_players_pos);
+        schedule.add_systems(get_player_polygon);
+        world.insert_resource(nav_data);
 
         log!("Ai manager Ready!");
-        log!(nav_data.chunck_count);
-        AiManager {
-            world,
-            schedule,
-            chunck_data: nav_data,
-        }
+        AiManager { world, schedule }
     }
 
     pub fn get_stats(&mut self) -> Stats {
