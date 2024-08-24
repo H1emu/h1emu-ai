@@ -151,8 +151,13 @@ fn get_player_polygon(
     nav_data: Res<NavData>,
 ) {
     for player_position in &mut player_query {
+        let x = player_position.x / 64.0;
+        let z = player_position.z / 64.0;
         log!(player_position);
-        todo!()
+        log!(format!("x interior : {}", (x / 4.0)));
+        log!(format!("z interior : {}", z / 4.0));
+        log!(format!("x : {}", (x)));
+        log!(format!("z : {}", z));
     }
 }
 #[wasm_bindgen]
