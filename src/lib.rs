@@ -194,22 +194,23 @@ struct NavData(ChunkData);
 #[wasm_bindgen]
 impl AiManager {
     #[wasm_bindgen(constructor)]
-    pub fn initialize(nav_data_compressed: &[u8]) -> AiManager {
+    pub fn initialize() -> AiManager {
+        let world = World::new();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(test_follow);
+        schedule.add_systems(track_players_pos);
+        schedule.add_systems(get_player_polygon);
+
+        AiManager { world, schedule }
+    }
+
+    pub fn load_nav_data(&mut self, nav_data_compressed: &[u8]) {
         log!("Start reading nav_data");
         let nav_data_uncompressed = decompress_size_prepended(&nav_data_compressed).unwrap();
 
         let nav_data: NavData = NavData(Cursor::new(nav_data_uncompressed).read_le().unwrap());
         log!("Finish reading nav_data");
-
-        let mut world = World::new();
-        let mut schedule = Schedule::default();
-        schedule.add_systems(test_follow);
-        schedule.add_systems(track_players_pos);
-        schedule.add_systems(get_player_polygon);
-        world.insert_resource(nav_data);
-
-        log!("Ai manager Ready!");
-        AiManager { world, schedule }
+        self.world.insert_resource(nav_data);
     }
 
     pub fn get_stats(&mut self) -> Stats {
