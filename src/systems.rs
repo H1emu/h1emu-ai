@@ -1,4 +1,4 @@
-use bevy_ecs::{entity, prelude::*};
+use bevy_ecs::prelude::*;
 use js_sys::Float32Array;
 use wasm_bindgen::JsValue;
 

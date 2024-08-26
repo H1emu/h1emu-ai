@@ -3,7 +3,7 @@ use std::sync::{
     Arc,
 };
 
-use bevy_ecs::{entity, prelude::*};
+use bevy_ecs::prelude::*;
 use js_sys::{Array, Float32Array, Function, Object, Reflect};
 use wasm_bindgen::JsValue;
 

@@ -1,8 +1,4 @@
 use binrw::binrw;
-use binrw::{
-    io::{Read, Seek},
-    BinRead, BinResult,
-};
 
 #[binrw]
 #[derive(Debug)]

@@ -1,23 +1,17 @@
-use core::panic;
 use std::{
     io::Cursor,
-    sync::{
-        atomic::{AtomicPtr, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicPtr, Arc},
 };
 
-use bevy_ecs::{entity, prelude::*};
+use bevy_ecs::prelude::*;
 use binrw::BinReaderExt;
-use chunck_schemas::{NavData, Triangle};
+use chunck_schemas::NavData;
 use components::{
     DeerEntity, EntityDefaultBundle, H1emuEntity, PlayerEntity, Position, ZombieEntity,
 };
-use js_sys::{Array, Float32Array, Function, Object, Reflect};
 use lz4_flex::decompress_size_prepended;
 use systems::{get_player_polygon, test_follow, track_players_pos};
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 mod chunck_schemas;
 mod components;
