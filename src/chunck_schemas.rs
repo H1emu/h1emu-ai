@@ -1,5 +1,3 @@
-
-
 use binrw::binrw;
 use binrw::{
     io::{Read, Seek},
@@ -74,7 +72,7 @@ struct Draws {
     info: [u8; 320],
 }
 #[binrw]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Triangle {
     pub vertices: [i32; 3], // Indices into a vertex list
     pub neighbors_count: u32,
@@ -82,22 +80,25 @@ pub struct Triangle {
     pub neighbors: Vec<i32>, // Indices of adjacent triangles
 }
 #[binrw]
-#[derive(Debug, Default)]
-pub struct Chunck {
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Cell {
     pub x: i32,
     pub y: i32,
+    pub start_poly_index: u32,
+    pub end_poly_index: u32,
+}
+
+#[binrw]
+#[derive(Debug, Default, Clone)]
+pub struct NavData {
+    pub cells_count: u32,
+    #[br(count = cells_count)]
+    pub cells: Vec<Cell>,
     pub polygons_count: u32,
     #[br(count = polygons_count)]
     pub polygons: Vec<Triangle>,
 }
 
-#[binrw]
-#[derive(Debug, Default)]
-pub struct ChunkData {
-    pub chunck_count: u32,
-    #[br(count = chunck_count)]
-    pub chuncks: Vec<Chunck>,
-}
 #[binrw]
 #[derive(Debug)]
 pub struct ChunkH1z1 {

@@ -7,159 +7,23 @@ use std::{
     },
 };
 
-use bevy_ecs::prelude::*;
+use bevy_ecs::{entity, prelude::*};
 use binrw::BinReaderExt;
-use chunck_schemas::ChunkData;
+use chunck_schemas::{NavData, Triangle};
+use components::{
+    DeerEntity, EntityDefaultBundle, H1emuEntity, PlayerEntity, Position, ZombieEntity,
+};
 use js_sys::{Array, Float32Array, Function, Object, Reflect};
 use lz4_flex::decompress_size_prepended;
+use systems::{get_player_polygon, test_follow, track_players_pos};
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 mod chunck_schemas;
+mod components;
+mod macros;
+mod systems;
 
-macro_rules! log {
-    ($($t:tt)*) => {
-        console::log_1(&format!("{:?}",$($t)*).into())
-    };
-}
-
-#[derive(Component)]
-struct H1emuEntity(Arc<AtomicPtr<js_sys::Object>>);
-
-impl H1emuEntity {
-    fn get_object(&self) -> Result<&Object, ()> {
-        // Load the raw pointer
-        let ptr = self.0.load(Ordering::SeqCst);
-
-        // Check if the pointer is null
-        if !ptr.is_null() {
-            // Convert the raw pointer to a reference
-            unsafe {
-                let obj = &*ptr;
-
-                // Ensure the conversion is valid
-                if obj.is_object() {
-                    return Ok(obj);
-                } else {
-                    log!("The stored value is not an object.");
-                    Err(())
-                }
-            }
-        } else {
-            panic!("Null pointer encountered.");
-        }
-    }
-    fn get_position(&self) -> Position {
-        let position_js_value = self
-            .get_property(vec![
-                &JsValue::from_str("state"),
-                &JsValue::from_str("position"),
-            ])
-            .unwrap();
-
-        let float32_array = Float32Array::from(position_js_value);
-
-        let vec = float32_array.to_vec();
-
-        return Position {
-            x: vec[0],
-            y: vec[1],
-            z: vec[2],
-        };
-    }
-    fn get_property(&self, property_chain: Vec<&JsValue>) -> Result<JsValue, ()> {
-        let mut current_obj = self.get_object().unwrap().to_owned();
-        for property in property_chain {
-            let property = Reflect::get(&current_obj, &property).unwrap();
-            if property.is_undefined() {
-                log!("specified property doesn't exist");
-                break;
-                // Err(())
-            } else {
-                current_obj = Object::from(property);
-            }
-        }
-        if !current_obj.is_undefined() {
-            Ok(JsValue::from(current_obj))
-        } else {
-            Err(())
-        }
-    }
-    fn call_method(&self, method: &JsValue, args: &Array) {
-        let obj = self.get_object().unwrap();
-        let func: Function = Function::from(Reflect::get(&obj, &method).unwrap());
-        if func.is_function() {
-            func.apply(obj, &args).unwrap();
-        } else {
-            log!("specified method doesn't exist")
-        }
-    }
-}
-
-#[derive(Component, Debug)]
-struct Position {
-    x: f32,
-    y: f32,
-    z: f32,
-}
-
-#[derive(Component)]
-struct ZombieEntity();
-#[derive(Component)]
-struct PlayerEntity();
-#[derive(Component)]
-struct DeerEntity();
-
-#[derive(Bundle)]
-struct EntityDefaultBundle {
-    h1emu_entity: H1emuEntity,
-    position: Position,
-}
-
-fn test_follow(
-    mut zombie_query: Query<&H1emuEntity, With<ZombieEntity>>,
-    mut player_query: Query<&H1emuEntity, With<PlayerEntity>>,
-) {
-    let method = &JsValue::from_str(&"goTo");
-    for obj in &mut zombie_query {
-        for player in &mut player_query {
-            let pos = player.get_position();
-            let args = js_sys::Array::new();
-            let jspa = js_sys::Array::new();
-            jspa.push(&JsValue::from(pos.x));
-            jspa.push(&JsValue::from(pos.y));
-            jspa.push(&JsValue::from(pos.z));
-
-            let js_pos = Float32Array::new(&jspa);
-            args.push(&js_pos);
-            obj.call_method(method, &args);
-        }
-    }
-}
-fn track_players_pos(mut player_query: Query<(&H1emuEntity, &mut Position), With<PlayerEntity>>) {
-    for (player, mut player_position) in &mut player_query {
-        let pos = player.get_position();
-        player_position.x = pos.x;
-        player_position.y = pos.y;
-        player_position.z = pos.z;
-        // log!(player_position);
-    }
-}
-
-fn get_player_polygon(
-    mut player_query: Query<&Position, With<PlayerEntity>>,
-    nav_data: Res<NavData>,
-) {
-    for player_position in &mut player_query {
-        let x = player_position.x / 64.0;
-        let z = player_position.z / 64.0;
-        log!(player_position);
-        log!(format!("x interior : {}", (x / 4.0)));
-        log!(format!("z interior : {}", z / 4.0));
-        log!(format!("x : {}", (x)));
-        log!(format!("z : {}", z));
-    }
-}
 #[wasm_bindgen]
 pub struct EntityFromJs {
     h1emu_id: js_sys::Object,
@@ -195,7 +59,7 @@ pub struct AiManager {
 }
 
 #[derive(Resource)]
-struct NavData(ChunkData);
+struct NavDataRes(NavData);
 #[wasm_bindgen]
 impl AiManager {
     #[wasm_bindgen(constructor)]
@@ -213,7 +77,8 @@ impl AiManager {
         log!("Start reading nav_data");
         let nav_data_uncompressed = decompress_size_prepended(&nav_data_compressed).unwrap();
 
-        let nav_data: NavData = NavData(Cursor::new(nav_data_uncompressed).read_le().unwrap());
+        let nav_data: NavDataRes =
+            NavDataRes(Cursor::new(nav_data_uncompressed).read_le().unwrap());
         log!("Finish reading nav_data");
         self.world.insert_resource(nav_data);
     }
