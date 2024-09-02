@@ -10,7 +10,9 @@ use components::{
     DeerEntity, EntityDefaultBundle, H1emuEntity, PlayerEntity, Position, ZombieEntity,
 };
 use lz4_flex::decompress_size_prepended;
-use systems::{get_player_polygon, test_follow, track_players_pos, update_current_cell};
+use systems::{
+    get_player_polygon, go_to_target, track_players_pos, update_current_cell, zombie_hunt,
+};
 use wasm_bindgen::prelude::*;
 
 mod chunck_schemas;
@@ -60,7 +62,8 @@ impl AiManager {
     pub fn initialize() -> AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
-        schedule.add_systems(test_follow);
+        schedule.add_systems(zombie_hunt);
+        // schedule.add_systems(go_to_target);
         schedule.add_systems(track_players_pos);
         schedule.add_systems(get_player_polygon);
         schedule.add_systems(update_current_cell);
@@ -89,13 +92,10 @@ impl AiManager {
         let h1emu_entity = Box::into_raw(Box::new(e.h1emu_id));
         let h1emu_entity_ptr = Arc::new(AtomicPtr::new(h1emu_entity));
         let h1emu_entity_component = H1emuEntity(h1emu_entity_ptr);
+        let position = h1emu_entity_component.get_position();
         let mut entity = self.world.spawn(EntityDefaultBundle {
             h1emu_entity: h1emu_entity_component,
-            position: Position {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
+            position,
             ..Default::default()
         });
         match e.entity_type {

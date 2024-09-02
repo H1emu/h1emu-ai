@@ -6,30 +6,10 @@ use wasm_bindgen::JsValue;
 
 use crate::{
     chunck_schemas::{Node, Triangle},
-    components::{CurrentCell, H1emuEntity, PlayerEntity, Position, ZombieEntity},
+    components::{CurrentCell, H1emuEntity, PlayerEntity, Position, Target, ZombieEntity},
     log, NavDataRes,
 };
 
-pub fn test_follow(
-    mut zombie_query: Query<&H1emuEntity, With<ZombieEntity>>,
-    mut player_query: Query<&H1emuEntity, With<PlayerEntity>>,
-) {
-    let method = &JsValue::from_str(&"goTo");
-    for obj in &mut zombie_query {
-        for player in &mut player_query {
-            let pos = player.get_position();
-            let args = js_sys::Array::new();
-            let jspa = js_sys::Array::new();
-            jspa.push(&JsValue::from(pos.x));
-            jspa.push(&JsValue::from(pos.y));
-            jspa.push(&JsValue::from(pos.z));
-
-            let js_pos = Float32Array::new(&jspa);
-            args.push(&js_pos);
-            obj.call_method(method, &args);
-        }
-    }
-}
 pub fn track_players_pos(
     mut player_query: Query<(&H1emuEntity, &mut Position), With<PlayerEntity>>,
 ) {
@@ -49,7 +29,7 @@ pub fn update_current_cell(
     for (mut cell, position) in &mut query {
         let x: i32 = position.x as i32 / 256;
         let z: i32 = position.z as i32 / 256;
-        let chuncks = nav_data.0.cells.clone();
+        let chuncks = &nav_data.0.cells;
         for i in 0..chuncks.len() {
             let c = chuncks.get(i).unwrap();
             if c.x == x && c.y == z {
@@ -109,7 +89,7 @@ fn get_polygon_from_pos(
     entity_position: &Position,
     nodes: &Vec<Node>,
     triangles: &Vec<Triangle>,
-) -> Option<()> {
+) -> Option<u32> {
     // log!(entity_position);
     // log!(format!(
     //     "search polygon between {},{} and {},{}",
@@ -118,7 +98,8 @@ fn get_polygon_from_pos(
     //     nodes[nodes.len() - 1].x,
     //     nodes[nodes.len() - 1].z
     // ));
-    for t in triangles {
+    for i in 0..triangles.len() {
+        let t = triangles.get(i).unwrap();
         let n1 = nodes.get(t.vertices_index[0] as usize).unwrap();
         let n2 = nodes.get(t.vertices_index[1] as usize).unwrap();
         let n3 = nodes.get(t.vertices_index[2] as usize).unwrap();
@@ -134,10 +115,10 @@ fn get_polygon_from_pos(
             n3.z as f32,
         ) {
             log!(entity_position);
-            log!(format!("found triangle !!! {:?},{:?},{:?}", n1, n2, n3));
-            ()
+            // log!(format!("found triangle !!! {:?},{:?},{:?}", n1, n2, n3));
+            log!(t);
+            return Some(i as u32);
         }
-        ()
     }
 
     None // Return None if no polygon contains the point
@@ -152,3 +133,46 @@ pub fn get_player_polygon(
         let poly = get_polygon_from_pos(player_position, &cell.nodes, &cell.triangles);
     }
 }
+
+pub fn zombie_hunt(
+    mut zombie_query: Query<(&Position, Entity), With<ZombieEntity>>,
+    mut others_query: Query<&Position, Without<ZombieEntity>>,
+    mut commands: Commands,
+) {
+    for (zpos, zent) in &mut zombie_query {
+        for pos in &mut others_query {
+            let mut e = commands.get_entity(zent).unwrap();
+            e.insert(Target(pos.clone()));
+        }
+    }
+}
+
+pub fn go_to_target(mut query: Query<(&Position, &Target)>, mut commands: Commands) {
+    for (pos, target) in &mut query {
+        log!(format!(
+            "I want to go from {:?} to here {:?}",
+            pos, target.0
+        ));
+    }
+}
+
+// pub fn test_follow(
+//     mut zombie_query: Query<&H1emuEntity, With<ZombieEntity>>,
+//     mut player_query: Query<&H1emuEntity, With<PlayerEntity>>,
+// ) {
+//     let method = &JsValue::from_str(&"goTo");
+//     for obj in &mut zombie_query {
+//         for player in &mut player_query {
+//             let pos = player.get_position();
+//             let args = js_sys::Array::new();
+//             let jspa = js_sys::Array::new();
+//             jspa.push(&JsValue::from(pos.x));
+//             jspa.push(&JsValue::from(pos.y));
+//             jspa.push(&JsValue::from(pos.z));
+//
+//             let js_pos = Float32Array::new(&jspa);
+//             args.push(&js_pos);
+//             obj.call_method(method, &args);
+//         }
+//     }
+// }

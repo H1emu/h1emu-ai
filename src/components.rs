@@ -76,12 +76,12 @@ impl H1emuEntity {
         if func.is_function() {
             func.apply(obj, &args).unwrap();
         } else {
-            log!("specified method doesn't exist")
+            log!("specified method doesn't exist");
         }
     }
 }
 
-#[derive(Component, Debug, Default)]
+#[derive(Component, Debug, Default, Clone, Copy)]
 pub struct Position {
     pub x: f32,
     pub y: f32,
@@ -89,6 +89,9 @@ pub struct Position {
 }
 #[derive(Component, Debug, Default)]
 pub struct CurrentCell(pub u32);
+
+#[derive(Component)]
+pub struct Target(pub Position);
 
 #[derive(Component)]
 pub struct ZombieEntity();
