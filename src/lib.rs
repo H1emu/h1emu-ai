@@ -10,7 +10,7 @@ use components::{
     DeerEntity, EntityDefaultBundle, H1emuEntity, PlayerEntity, Position, ZombieEntity,
 };
 use lz4_flex::decompress_size_prepended;
-use systems::{get_player_polygon, test_follow, track_players_pos};
+use systems::{get_player_polygon, test_follow, track_players_pos, update_current_cell};
 use wasm_bindgen::prelude::*;
 
 mod chunck_schemas;
@@ -63,6 +63,7 @@ impl AiManager {
         schedule.add_systems(test_follow);
         schedule.add_systems(track_players_pos);
         schedule.add_systems(get_player_polygon);
+        schedule.add_systems(update_current_cell);
 
         AiManager { world, schedule }
     }
@@ -95,6 +96,7 @@ impl AiManager {
                 y: 0.0,
                 z: 0.0,
             },
+            ..Default::default()
         });
         match e.entity_type {
             EntityType::Player => entity.insert(PlayerEntity {}),

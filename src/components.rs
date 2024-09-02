@@ -7,9 +7,9 @@ use bevy_ecs::prelude::*;
 use js_sys::{Array, Float32Array, Function, Object, Reflect};
 use wasm_bindgen::JsValue;
 
-use crate::log;
+use crate::{chunck_schemas::Cell, log};
 
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct H1emuEntity(pub Arc<AtomicPtr<js_sys::Object>>);
 impl H1emuEntity {
     pub fn get_object(&self) -> Result<&Object, ()> {
@@ -81,12 +81,14 @@ impl H1emuEntity {
     }
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Default)]
 pub struct Position {
     pub x: f32,
     pub y: f32,
     pub z: f32,
 }
+#[derive(Component, Debug, Default)]
+pub struct CurrentCell(pub u32);
 
 #[derive(Component)]
 pub struct ZombieEntity();
@@ -95,9 +97,9 @@ pub struct PlayerEntity();
 #[derive(Component)]
 pub struct DeerEntity();
 
-#[derive(Bundle)]
+#[derive(Bundle, Default)]
 pub struct EntityDefaultBundle {
     pub h1emu_entity: H1emuEntity,
     pub position: Position,
+    pub current_cell: CurrentCell,
 }
-

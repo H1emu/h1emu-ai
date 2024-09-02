@@ -1,10 +1,12 @@
+use std::fmt::format;
+
 use bevy_ecs::prelude::*;
 use js_sys::Float32Array;
 use wasm_bindgen::JsValue;
 
 use crate::{
-    chunck_schemas::Triangle,
-    components::{H1emuEntity, PlayerEntity, Position, ZombieEntity},
+    chunck_schemas::{Node, Triangle},
+    components::{CurrentCell, H1emuEntity, PlayerEntity, Position, ZombieEntity},
     log, NavDataRes,
 };
 
@@ -40,58 +42,128 @@ pub fn track_players_pos(
     }
 }
 
-fn get_polygon_from_pos(entity_position: &Position, polygons: &Vec<Triangle>) -> Option<i32> {
-    let point = (entity_position.x, entity_position.z); // Project to 2D (ignoring y-axis)
-    for p in polygons {
-        if p.vertices[0] == entity_position.x as i32 {
-            log!(p);
-            return Some(p.vertices[0]);
+pub fn update_current_cell(
+    mut query: Query<(&mut CurrentCell, &Position)>,
+    nav_data: Res<NavDataRes>,
+) {
+    for (mut cell, position) in &mut query {
+        let x: i32 = position.x as i32 / 256;
+        let z: i32 = position.z as i32 / 256;
+        let chuncks = nav_data.0.cells.clone();
+        for i in 0..chuncks.len() {
+            let c = chuncks.get(i).unwrap();
+            if c.x == x && c.y == z {
+                cell.0 = i as u32;
+                break;
+            }
         }
     }
+}
 
-    // for (index, polygon) in polygons.iter().enumerate() {
-    //     // Convert 3D vertices to 2D points for the test
-    //     let polygon_2d: Vec<(f32, f32)> = polygon.vertices
-    //         .iter()
-    //         .map(|v| (v.x, v.z))
-    //         .collect();
-    //
-    //     if is_point_in_polygon(point, &polygon_2d) {
-    //         return Some(index); // Return the index of the containing polygon
-    //     }
-    // }
+fn is_point_in_triangle_2d(
+    px: f32,
+    py: f32,
+    ax: f32,
+    ay: f32,
+    bx: f32,
+    by: f32,
+    cx: f32,
+    cy: f32,
+) -> bool {
+    let cross1 = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+    let cross2 = (cx - bx) * (py - by) - (cy - by) * (px - bx);
+    let cross3 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx);
+
+    (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0)
+        || (cross1 <= 0.0 && cross2 <= 0.0 && cross3 <= 0.0)
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn point_triangle() {
+        let r = super::is_point_in_triangle_2d(
+            31.28, 69.43, 32 as f32, 69 as f32, 32 as f32, 70 as f32, 29 as f32, 73 as f32,
+        );
+        assert_eq!(r, false);
+    }
+    #[test]
+    fn point_triangle2() {
+        let r = super::is_point_in_triangle_2d(31.28, 69.43, 32.0, 69.0, 32.0, 70.0, 29.0, 73.0);
+        assert_eq!(r, false);
+    }
+    #[test]
+    fn point_inside_triangle() {
+        let r = super::is_point_in_triangle_2d(
+            2.0, 2.0, // Point P
+            0.0, 0.0, // Vertex A
+            5.0, 0.0, // Vertex B
+            2.5, 5.0, // Vertex C
+        );
+        assert_eq!(r, true);
+    }
+}
+
+fn get_polygon_from_pos(
+    entity_position: &Position,
+    nodes: &Vec<Node>,
+    triangles: &Vec<Triangle>,
+) -> Option<()> {
+    log!(entity_position);
+    log!(format!(
+        "search polygon between {},{} and {},{}",
+        nodes[0].x,
+        nodes[0].z,
+        nodes[nodes.len() - 1].x,
+        nodes[nodes.len() - 1].z
+    ));
+    for t in triangles {
+        let n1 = nodes.get(t.vertices_index[0] as usize).unwrap();
+        let n2 = nodes.get(t.vertices_index[1] as usize).unwrap();
+        let n3 = nodes.get(t.vertices_index[2] as usize).unwrap();
+        let eee: f32 = entity_position.x - n1.x as f32;
+        let eeee: f32 = entity_position.z - n1.z as f32;
+        if eee.abs() < 1.0 && eeee.abs() < 1.0 {
+            log!(format!(
+                "Is {},{} in {},{}/{},{}/{},{}",
+                entity_position.x,
+                entity_position.z,
+                n1.x as f32,
+                n1.z as f32,
+                n2.x as f32,
+                n2.z as f32,
+                n3.x as f32,
+                n3.z as f32,
+            ));
+        }
+
+        if is_point_in_triangle_2d(
+            entity_position.x,
+            entity_position.z,
+            n1.x as f32,
+            n1.z as f32,
+            n2.x as f32,
+            n2.z as f32,
+            n3.x as f32,
+            n3.z as f32,
+        ) {
+            println!("found triangle !!! {:?}", t);
+            ()
+        }
+        ()
+    }
+    log!("end log");
 
     None // Return None if no polygon contains the point
 }
 
 pub fn get_player_polygon(
-    mut player_query: Query<&Position, With<PlayerEntity>>,
+    mut query: Query<(&Position, &CurrentCell), With<PlayerEntity>>,
     nav_data: Res<NavDataRes>,
 ) {
-    for player_position in &mut player_query {
-        let x: i32 = player_position.x as i32 / 256;
-        let z: i32 = player_position.z as i32 / 256;
-        log!(player_position);
-        log!(format!("x : {}", (x)));
-        log!(format!("z : {}", z));
-        let chuncks = nav_data.0.cells.clone();
-        let mut player_chunk = "chunck not found".to_owned();
-        for c in chuncks {
-            if c.x == x && c.y == z {
-                player_chunk = format!("chunck found x {x} y {z}");
-                let pos_from_poly = get_polygon_from_pos(
-                    player_position,
-                    &nav_data.0.polygons[c.start_poly_index as usize..c.end_poly_index as usize]
-                        .to_vec(),
-                );
-                if pos_from_poly.is_some() {
-                    log!("Polygon found !!!!!")
-                } else {
-                    log!("Didn't found polygon")
-                }
-            }
-        }
-        log!(player_chunk)
+    for (player_position, cell_index) in &mut query {
+        let cell = nav_data.0.cells.get(cell_index.0 as usize).unwrap();
+        let poly = get_polygon_from_pos(player_position, &cell.nodes, &cell.triangles);
     }
 }
-

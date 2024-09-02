@@ -1,4 +1,8 @@
-use binrw::binrw;
+use binrw::{binrw, BinWrite};
+use binrw::{
+    io::{Read, Seek},
+    BinRead, BinResult,
+};
 
 #[binrw]
 #[derive(Debug)]
@@ -47,6 +51,14 @@ pub struct Vertices {
 }
 
 #[binrw]
+#[derive(Debug, Clone)]
+pub struct Node {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+}
+
+#[binrw]
 #[derive(Debug)]
 pub struct Batches {
     pub unk: u32,
@@ -68,33 +80,32 @@ struct Draws {
     info: [u8; 320],
 }
 #[binrw]
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Triangle {
-    pub vertices: [i32; 3], // Indices into a vertex list
+    pub vertices_index: [u32; 3], // Indices into a vertex list
     pub neighbors_count: u32,
     #[br(count = neighbors_count)]
     pub neighbors: Vec<i32>, // Indices of adjacent triangles
 }
-#[binrw]
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, BinRead, BinWrite, Clone)]
 pub struct Cell {
     pub x: i32,
     pub y: i32,
-    pub start_poly_index: u32,
-    pub end_poly_index: u32,
+    pub vertices_count: u32,
+    #[br(count = vertices_count)]
+    pub nodes: Vec<Node>,
+    pub triangles_count: u32,
+    #[br(count = triangles_count)]
+    pub triangles: Vec<Triangle>,
 }
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct NavData {
     pub cells_count: u32,
     #[br(count = cells_count)]
     pub cells: Vec<Cell>,
-    pub polygons_count: u32,
-    #[br(count = polygons_count)]
-    pub polygons: Vec<Triangle>,
 }
-
 #[binrw]
 #[derive(Debug)]
 pub struct ChunkH1z1 {
