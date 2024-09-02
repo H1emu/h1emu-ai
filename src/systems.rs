@@ -6,7 +6,9 @@ use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
 use crate::{
     chunck_schemas::{Cell, Node, Triangle},
-    components::{CurrentCell, H1emuEntity, PlayerEntity, Position, Target, ZombieEntity},
+    components::{
+        BreadScrum, CurrentCell, H1emuEntity, PlayerEntity, Position, Target, ZombieEntity,
+    },
     log, NavDataRes,
 };
 
@@ -23,7 +25,7 @@ pub fn track_players_pos(
 }
 
 pub fn update_current_cell(
-    mut query: Query<(&mut CurrentCell, &Position)>,
+    mut query: Query<(&mut CurrentCell, &Position), Changed<Position>>,
     nav_data: Res<NavDataRes>,
 ) {
     for (mut cell, position) in &mut query {
@@ -124,19 +126,9 @@ fn get_polygon_index_from_pos(
     None // Return None if no polygon contains the point
 }
 
-pub fn get_player_polygon(
-    mut query: Query<(&Position, &CurrentCell), With<PlayerEntity>>,
-    nav_data: Res<NavDataRes>,
-) {
-    for (player_position, cell_index) in &mut query {
-        let cell = nav_data.0.cells.get(cell_index.0 as usize).unwrap();
-        let poly = get_polygon_index_from_pos(player_position, &cell.nodes, &cell.triangles);
-    }
-}
-
 pub fn zombie_hunt(
-    mut zombie_query: Query<(&Position, Entity), With<ZombieEntity>>,
-    mut others_query: Query<&Position, Without<ZombieEntity>>,
+    mut zombie_query: Query<(&Position, Entity), (With<ZombieEntity>,)>,
+    mut others_query: Query<&Position, (Without<ZombieEntity>,)>,
     mut commands: Commands,
 ) {
     for (zpos, zent) in &mut zombie_query {
@@ -165,12 +157,69 @@ fn euclidean_distance(vec_a: &Position, vec_b: &Position) -> f32 {
     let dz = vec_a.z - vec_b.z;
     (dx * dx + dy * dy + dz * dz).sqrt()
 }
-
-pub fn go_to_target(
-    mut query: Query<(&Position, &Target, &CurrentCell)>,
+pub fn follow_breadscrum(
+    mut query: Query<(
+        &mut Position,
+        &mut BreadScrum,
+        &H1emuEntity,
+        &CurrentCell,
+        Entity,
+    )>,
     nav_data: Res<NavDataRes>,
+    mut commands: Commands,
 ) {
-    for (pos, target, cell_index) in &mut query {
+    for (mut pos, mut bs, entity, cell_index, e) in &mut query {
+        if bs.0.len() == 0 {
+            commands.get_entity(e).unwrap().remove::<BreadScrum>();
+            continue;
+        }
+        let next_triangle = match bs.0.get(0) {
+            Some(index) => &nav_data.0.cells[cell_index.0 as usize]
+                .triangles
+                .get((*index) as usize),
+            None => {
+                commands.get_entity(e).unwrap().remove::<BreadScrum>();
+                continue;
+            } // Skip
+        };
+        let next_node = match next_triangle {
+            Some(t) => nav_data.0.cells[cell_index.0 as usize]
+                .nodes
+                .get(t.vertices_index[0] as usize),
+            None => {
+                commands.get_entity(e).unwrap().remove::<BreadScrum>();
+                continue;
+            } // Skip
+        };
+        if next_node.is_some() {
+            bs.0.remove(0);
+            let node = next_node.unwrap();
+
+            let method = &JsValue::from_str(&"goTo");
+            let args = js_sys::Array::new();
+            let jspa = js_sys::Array::new();
+            jspa.push(&JsValue::from(node.x));
+            jspa.push(&JsValue::from(node.y + 20));
+            jspa.push(&JsValue::from(node.z));
+            // move this in a sys
+            pos.x = node.x as f32;
+            pos.y = node.y as f32 + 20.0;
+            pos.z = node.z as f32;
+
+            log!(format!("go to {:?}", node));
+            let js_pos = Float32Array::new(&jspa);
+            args.push(&js_pos);
+            entity.call_method(method, &args);
+        }
+    }
+}
+
+pub fn get_target_breadscrum(
+    mut query: Query<(&Position, &Target, &CurrentCell, Entity)>,
+    nav_data: Res<NavDataRes>,
+    mut commands: Commands,
+) {
+    for (pos, target, cell_index, e) in &mut query {
         log!(format!(
             "I want to go from {:?} to here {:?}",
             pos, target.0
@@ -208,51 +257,16 @@ pub fn go_to_target(
             y: v0_target.y as f32,
             z: v0_target.z as f32,
         };
-        log!(original_poly_index);
-        log!(target_poly_index);
-        let mut polygon_loop_index = original_poly_index;
-        let mut path_nodes: HashMap<u32, NodePath> = HashMap::new();
-        let mut maxloop = 0;
-        loop {
-            maxloop += 1;
-            if maxloop > 1000 {
-                log!("exausted");
-                break;
-            }
-            let current_polygon = cell.triangles.get(polygon_loop_index as usize).unwrap();
 
-            if polygon_loop_index == target_poly_index {
-                log!("fouuund");
-                break;
-            }
-            let mut slowest_n_score: u32 = 1e2 as u32;
-            for i in &current_polygon.neighbors {
-                if path_nodes.contains_key(&(*i as u32)) {
-                    log!("skip");
-                    continue;
-                }
-                let poly_neighbor = cell.triangles.get(*i as usize).unwrap();
-                let v0_neighbor = cell
-                    .nodes
-                    .get(poly_neighbor.vertices_index[0] as usize)
-                    .unwrap();
-                let neighbor_poly_pos: Position = Position {
-                    x: v0_neighbor.x as f32,
-                    y: v0_neighbor.y as f32,
-                    z: v0_neighbor.z as f32,
-                };
-                let gcost = euclidean_distance(&neighbor_poly_pos, &target_poly_pos) as u32;
-                let hcost = euclidean_distance(&neighbor_poly_pos, &original_poly_pos) as u32;
-                let n = NodePath { gcost, hcost };
-                if n.get_fcost() < slowest_n_score {
-                    // TODO: why neighbor is a i32 ??
-                    polygon_loop_index = *i as u32;
-                    slowest_n_score = n.get_fcost();
-                }
-                path_nodes.insert(*i as u32, n);
-            }
-        }
-        log!(path_nodes);
+        let paths = astar_search(
+            cell,
+            original_poly_index,
+            target_poly_index,
+            target_poly_pos,
+            original_poly_pos,
+        );
+        let mut ec = commands.get_entity(e).unwrap();
+        ec.insert(BreadScrum(paths));
     }
 }
 
@@ -262,11 +276,12 @@ fn astar_search(
     target_poly_index: u32,
     target_poly_pos: Position,
     original_poly_pos: Position,
-) {
+) -> Vec<u32> {
     let mut polygon_loop_index = original_poly_index;
     let mut path_nodes: HashMap<u32, NodePath> = HashMap::new();
     let mut open_list: Vec<u32> = Vec::new(); // List of nodes to explore
     let mut closed_list: HashMap<u32, NodePath> = HashMap::new();
+    let mut predecessors: HashMap<u32, u32> = HashMap::new(); // To track the path
 
     open_list.push(polygon_loop_index);
 
@@ -313,16 +328,31 @@ fn astar_search(
             {
                 path_nodes.insert(neighbor_index as u32, path);
                 open_list.push(neighbor_index as u32);
+                predecessors.insert(neighbor_index as u32, current_index); // Update predecessor
             }
         }
 
-        closed_list.insert(
-            current_index,
-            path_nodes.get(&current_index).unwrap().clone(),
-        );
+        let v = path_nodes.get(&current_index).clone();
+        if v.is_some() {
+            closed_list.insert(current_index, v.unwrap().clone());
+        }
     }
-
-    log!(path_nodes);
+    let mut path: Vec<u32> = vec![];
+    let mut indexos = target_poly_index;
+    loop {
+        if indexos == original_poly_index {
+            break;
+        }
+        let p = predecessors.get(&indexos);
+        if p.is_none() {
+            break;
+        }
+        path.push(*p.unwrap());
+        indexos = *p.unwrap();
+    }
+    path.reverse();
+    log!(path);
+    return path;
 }
 
 // pub fn test_follow(

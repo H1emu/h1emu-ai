@@ -11,7 +11,7 @@ use components::{
 };
 use lz4_flex::decompress_size_prepended;
 use systems::{
-    get_player_polygon, go_to_target, track_players_pos, update_current_cell, zombie_hunt,
+    follow_breadscrum, get_target_breadscrum, track_players_pos, update_current_cell, zombie_hunt,
 };
 use wasm_bindgen::prelude::*;
 
@@ -63,10 +63,10 @@ impl AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
         schedule.add_systems(zombie_hunt);
-        schedule.add_systems(go_to_target);
+        schedule.add_systems(get_target_breadscrum);
         schedule.add_systems(track_players_pos);
-        schedule.add_systems(get_player_polygon);
         schedule.add_systems(update_current_cell);
+        schedule.add_systems(follow_breadscrum);
 
         AiManager { world, schedule }
     }

@@ -94,6 +94,9 @@ pub struct CurrentCell(pub u32);
 pub struct Target(pub Position);
 
 #[derive(Component)]
+pub struct BreadScrum(pub Vec<u32>);
+
+#[derive(Component)]
 pub struct ZombieEntity();
 #[derive(Component)]
 pub struct PlayerEntity();
