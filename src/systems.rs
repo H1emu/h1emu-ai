@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn point_inside_triangle() {
         let r = super::is_point_in_triangle_2d(
-            2.0, 2.0, // Point P
+            2.5, 2.0, // Point P
             0.0, 0.0, // Vertex A
             5.0, 0.0, // Vertex B
             2.5, 5.0, // Vertex C
@@ -110,33 +110,18 @@ fn get_polygon_from_pos(
     nodes: &Vec<Node>,
     triangles: &Vec<Triangle>,
 ) -> Option<()> {
-    log!(entity_position);
-    log!(format!(
-        "search polygon between {},{} and {},{}",
-        nodes[0].x,
-        nodes[0].z,
-        nodes[nodes.len() - 1].x,
-        nodes[nodes.len() - 1].z
-    ));
+    // log!(entity_position);
+    // log!(format!(
+    //     "search polygon between {},{} and {},{}",
+    //     nodes[0].x,
+    //     nodes[0].z,
+    //     nodes[nodes.len() - 1].x,
+    //     nodes[nodes.len() - 1].z
+    // ));
     for t in triangles {
         let n1 = nodes.get(t.vertices_index[0] as usize).unwrap();
         let n2 = nodes.get(t.vertices_index[1] as usize).unwrap();
         let n3 = nodes.get(t.vertices_index[2] as usize).unwrap();
-        let eee: f32 = entity_position.x - n1.x as f32;
-        let eeee: f32 = entity_position.z - n1.z as f32;
-        if eee.abs() < 1.0 && eeee.abs() < 1.0 {
-            log!(format!(
-                "Is {},{} in {},{}/{},{}/{},{}",
-                entity_position.x,
-                entity_position.z,
-                n1.x as f32,
-                n1.z as f32,
-                n2.x as f32,
-                n2.z as f32,
-                n3.x as f32,
-                n3.z as f32,
-            ));
-        }
 
         if is_point_in_triangle_2d(
             entity_position.x,
@@ -148,12 +133,12 @@ fn get_polygon_from_pos(
             n3.x as f32,
             n3.z as f32,
         ) {
-            println!("found triangle !!! {:?}", t);
+            log!(entity_position);
+            log!(format!("found triangle !!! {:?},{:?},{:?}", n1, n2, n3));
             ()
         }
         ()
     }
-    log!("end log");
 
     None // Return None if no polygon contains the point
 }
