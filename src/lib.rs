@@ -63,7 +63,7 @@ impl AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
         schedule.add_systems(zombie_hunt);
-        // schedule.add_systems(go_to_target);
+        schedule.add_systems(go_to_target);
         schedule.add_systems(track_players_pos);
         schedule.add_systems(get_player_polygon);
         schedule.add_systems(update_current_cell);

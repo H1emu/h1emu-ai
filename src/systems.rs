@@ -1,11 +1,11 @@
-use std::fmt::format;
+use std::{collections::HashMap, env::current_dir, fmt::format};
 
 use bevy_ecs::prelude::*;
 use js_sys::Float32Array;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
 use crate::{
-    chunck_schemas::{Node, Triangle},
+    chunck_schemas::{Cell, Node, Triangle},
     components::{CurrentCell, H1emuEntity, PlayerEntity, Position, Target, ZombieEntity},
     log, NavDataRes,
 };
@@ -85,7 +85,7 @@ mod tests {
     }
 }
 
-fn get_polygon_from_pos(
+fn get_polygon_index_from_pos(
     entity_position: &Position,
     nodes: &Vec<Node>,
     triangles: &Vec<Triangle>,
@@ -130,7 +130,7 @@ pub fn get_player_polygon(
 ) {
     for (player_position, cell_index) in &mut query {
         let cell = nav_data.0.cells.get(cell_index.0 as usize).unwrap();
-        let poly = get_polygon_from_pos(player_position, &cell.nodes, &cell.triangles);
+        let poly = get_polygon_index_from_pos(player_position, &cell.nodes, &cell.triangles);
     }
 }
 
@@ -147,13 +147,182 @@ pub fn zombie_hunt(
     }
 }
 
-pub fn go_to_target(mut query: Query<(&Position, &Target)>, mut commands: Commands) {
-    for (pos, target) in &mut query {
+#[derive(Debug, Clone, Copy)]
+struct NodePath {
+    pub gcost: u32,
+    pub hcost: u32,
+}
+
+impl NodePath {
+    pub fn get_fcost(&self) -> u32 {
+        self.gcost + self.hcost
+    }
+}
+
+fn euclidean_distance(vec_a: &Position, vec_b: &Position) -> f32 {
+    let dx = vec_a.x - vec_b.x;
+    let dy = vec_a.y - vec_b.y;
+    let dz = vec_a.z - vec_b.z;
+    (dx * dx + dy * dy + dz * dz).sqrt()
+}
+
+pub fn go_to_target(
+    mut query: Query<(&Position, &Target, &CurrentCell)>,
+    nav_data: Res<NavDataRes>,
+) {
+    for (pos, target, cell_index) in &mut query {
         log!(format!(
             "I want to go from {:?} to here {:?}",
             pos, target.0
         ));
+        let cell = nav_data.0.cells.get(cell_index.0 as usize).unwrap();
+        let original_poly_index =
+            get_polygon_index_from_pos(&pos, &cell.nodes, &cell.triangles).unwrap_throw();
+        let original_poly = cell.triangles.get(original_poly_index as usize).unwrap();
+        let v0_original = cell
+            .nodes
+            .get(original_poly.vertices_index[0] as usize)
+            .unwrap();
+        let original_poly_pos: Position = Position {
+            x: v0_original.x as f32,
+            y: v0_original.y as f32,
+            z: v0_original.z as f32,
+        };
+
+        // TODO: can be null since it can be from another cell
+        let target_poly_index =
+            get_polygon_index_from_pos(&target.0, &cell.nodes, &cell.triangles).unwrap_or(0);
+        if target_poly_index == 0 {
+            log!("Target lost!!");
+            return;
+        }
+
+        let target_poly = cell.triangles.get(target_poly_index as usize).unwrap();
+
+        let v0_target = cell
+            .nodes
+            .get(target_poly.vertices_index[0] as usize)
+            .unwrap();
+        let target_poly_pos: Position = Position {
+            x: v0_target.x as f32,
+            y: v0_target.y as f32,
+            z: v0_target.z as f32,
+        };
+        log!(original_poly_index);
+        log!(target_poly_index);
+        let mut polygon_loop_index = original_poly_index;
+        let mut path_nodes: HashMap<u32, NodePath> = HashMap::new();
+        let mut maxloop = 0;
+        loop {
+            maxloop += 1;
+            if maxloop > 1000 {
+                log!("exausted");
+                break;
+            }
+            let current_polygon = cell.triangles.get(polygon_loop_index as usize).unwrap();
+
+            if polygon_loop_index == target_poly_index {
+                log!("fouuund");
+                break;
+            }
+            let mut slowest_n_score: u32 = 1e2 as u32;
+            for i in &current_polygon.neighbors {
+                if path_nodes.contains_key(&(*i as u32)) {
+                    log!("skip");
+                    continue;
+                }
+                let poly_neighbor = cell.triangles.get(*i as usize).unwrap();
+                let v0_neighbor = cell
+                    .nodes
+                    .get(poly_neighbor.vertices_index[0] as usize)
+                    .unwrap();
+                let neighbor_poly_pos: Position = Position {
+                    x: v0_neighbor.x as f32,
+                    y: v0_neighbor.y as f32,
+                    z: v0_neighbor.z as f32,
+                };
+                let gcost = euclidean_distance(&neighbor_poly_pos, &target_poly_pos) as u32;
+                let hcost = euclidean_distance(&neighbor_poly_pos, &original_poly_pos) as u32;
+                let n = NodePath { gcost, hcost };
+                if n.get_fcost() < slowest_n_score {
+                    // TODO: why neighbor is a i32 ??
+                    polygon_loop_index = *i as u32;
+                    slowest_n_score = n.get_fcost();
+                }
+                path_nodes.insert(*i as u32, n);
+            }
+        }
+        log!(path_nodes);
     }
+}
+
+fn astar_search(
+    cell: &Cell, // assuming Cell is a struct containing triangles and nodes
+    original_poly_index: u32,
+    target_poly_index: u32,
+    target_poly_pos: Position,
+    original_poly_pos: Position,
+) {
+    let mut polygon_loop_index = original_poly_index;
+    let mut path_nodes: HashMap<u32, NodePath> = HashMap::new();
+    let mut open_list: Vec<u32> = Vec::new(); // List of nodes to explore
+    let mut closed_list: HashMap<u32, NodePath> = HashMap::new();
+
+    open_list.push(polygon_loop_index);
+
+    while let Some(current_index) = open_list.pop() {
+        if current_index == target_poly_index {
+            log!("Found the target polygon!");
+            break;
+        }
+
+        let current_polygon = match cell.triangles.get(current_index as usize) {
+            Some(polygon) => polygon,
+            None => continue, // Skip if polygon not found
+        };
+
+        let current_position = match cell.nodes.get(current_polygon.vertices_index[0] as usize) {
+            Some(node) => Position {
+                x: node.x as f32,
+                y: node.y as f32,
+                z: node.z as f32,
+            },
+            None => continue, // Skip if node not found
+        };
+
+        for &neighbor_index in &current_polygon.neighbors {
+            if closed_list.contains_key(&(neighbor_index as u32)) {
+                continue; // Skip nodes already processed
+            }
+
+            let neighbor_position = match cell.nodes.get(neighbor_index as usize) {
+                Some(node) => Position {
+                    x: node.x as f32,
+                    y: node.y as f32,
+                    z: node.z as f32,
+                },
+                None => continue, // Skip if node not found
+            };
+
+            let gcost = euclidean_distance(&neighbor_position, &original_poly_pos) as u32;
+            let hcost = euclidean_distance(&neighbor_position, &target_poly_pos) as u32;
+            let path = NodePath { gcost, hcost };
+
+            if !path_nodes.contains_key(&(neighbor_index as u32))
+                || path.get_fcost() < path_nodes[&(neighbor_index as u32)].get_fcost()
+            {
+                path_nodes.insert(neighbor_index as u32, path);
+                open_list.push(neighbor_index as u32);
+            }
+        }
+
+        closed_list.insert(
+            current_index,
+            path_nodes.get(&current_index).unwrap().clone(),
+        );
+    }
+
+    log!(path_nodes);
 }
 
 // pub fn test_follow(
