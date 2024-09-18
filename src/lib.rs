@@ -1,21 +1,10 @@
-use std::{
-    io::Cursor,
-    sync::{atomic::AtomicPtr, Arc},
-};
+use std::sync::{atomic::AtomicPtr, Arc};
 
 use bevy_ecs::prelude::*;
-use binrw::BinReaderExt;
-use chunck_schemas::NavData;
-use components::{
-    DeerEntity, EntityDefaultBundle, H1emuEntity, PlayerEntity, Position, ZombieEntity,
-};
-use lz4_flex::decompress_size_prepended;
-use systems::{
-    follow_breadscrum, get_target_breadscrum, track_players_pos, update_current_cell, zombie_hunt,
-};
+use components::{DeerEntity, EntityDefaultBundle, H1emuEntity, PlayerEntity, ZombieEntity};
+use systems::{test_follow, track_players_pos};
 use wasm_bindgen::prelude::*;
 
-mod chunck_schemas;
 mod components;
 mod macros;
 mod systems;
@@ -54,31 +43,16 @@ pub struct AiManager {
     schedule: Schedule,
 }
 
-#[derive(Resource)]
-struct NavDataRes(NavData);
 #[wasm_bindgen]
 impl AiManager {
     #[wasm_bindgen(constructor)]
     pub fn initialize() -> AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
-        schedule.add_systems(zombie_hunt);
-        schedule.add_systems(get_target_breadscrum);
+        schedule.add_systems(test_follow);
         schedule.add_systems(track_players_pos);
-        schedule.add_systems(update_current_cell);
-        schedule.add_systems(follow_breadscrum);
 
         AiManager { world, schedule }
-    }
-
-    pub fn load_nav_data(&mut self, nav_data_compressed: &[u8]) {
-        log!("Start reading nav_data");
-        let nav_data_uncompressed = decompress_size_prepended(&nav_data_compressed).unwrap();
-
-        let nav_data: NavDataRes =
-            NavDataRes(Cursor::new(nav_data_uncompressed).read_le().unwrap());
-        log!("Finish reading nav_data");
-        self.world.insert_resource(nav_data);
     }
 
     pub fn get_stats(&mut self) -> Stats {

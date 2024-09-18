@@ -7,7 +7,7 @@ use bevy_ecs::prelude::*;
 use js_sys::{Array, Float32Array, Function, Object, Reflect};
 use wasm_bindgen::JsValue;
 
-use crate::{chunck_schemas::Cell, log};
+use crate::log;
 
 #[derive(Component, Default)]
 pub struct H1emuEntity(pub Arc<AtomicPtr<js_sys::Object>>);
@@ -24,7 +24,7 @@ impl H1emuEntity {
 
                 // Ensure the conversion is valid
                 if obj.is_object() {
-                    return Ok(obj);
+                    Ok(obj)
                 } else {
                     log!("The stored value is not an object.");
                     Err(())
@@ -46,16 +46,16 @@ impl H1emuEntity {
 
         let vec = float32_array.to_vec();
 
-        return Position {
+        Position {
             x: vec[0],
             y: vec[1],
             z: vec[2],
-        };
+        }
     }
     pub fn get_property(&self, property_chain: Vec<&JsValue>) -> Result<JsValue, ()> {
         let mut current_obj = self.get_object().unwrap().to_owned();
         for property in property_chain {
-            let property = Reflect::get(&current_obj, &property).unwrap();
+            let property = Reflect::get(&current_obj, property).unwrap();
             if property.is_undefined() {
                 log!("specified property doesn't exist");
                 break;
@@ -72,9 +72,9 @@ impl H1emuEntity {
     }
     pub fn call_method(&self, method: &JsValue, args: &Array) {
         let obj = self.get_object().unwrap();
-        let func: Function = Function::from(Reflect::get(&obj, &method).unwrap());
+        let func: Function = Function::from(Reflect::get(obj, method).unwrap());
         if func.is_function() {
-            func.apply(obj, &args).unwrap();
+            func.apply(obj, args).unwrap();
         } else {
             log!("specified method doesn't exist");
         }
@@ -87,14 +87,6 @@ pub struct Position {
     pub y: f32,
     pub z: f32,
 }
-#[derive(Component, Debug, Default)]
-pub struct CurrentCell(pub u32);
-
-#[derive(Component)]
-pub struct Target(pub Position);
-
-#[derive(Component)]
-pub struct BreadScrum(pub Vec<u32>);
 
 #[derive(Component)]
 pub struct ZombieEntity();
@@ -107,5 +99,4 @@ pub struct DeerEntity();
 pub struct EntityDefaultBundle {
     pub h1emu_entity: H1emuEntity,
     pub position: Position,
-    pub current_cell: CurrentCell,
 }

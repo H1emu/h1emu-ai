@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 // #[path = "../src/lib.rs"]
 // mod lib;
@@ -7,7 +7,7 @@ use wasm_bindgen::JsValue;
 
 fn public_function(c: &mut Criterion) {
     c.bench_function("AiManager::initialize", |b| {
-        b.iter(|| AiManager::initialize())
+        b.iter(AiManager::initialize)
     });
     let mut ai = AiManager::initialize();
     c.bench_function("AiManager::add_entity", |b| {
