@@ -49,7 +49,6 @@ impl AiManager {
     pub fn initialize() -> AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
-        schedule.add_systems(test_follow);
         schedule.add_systems(track_players_pos);
 
         AiManager { world, schedule }
