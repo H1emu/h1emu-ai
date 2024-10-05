@@ -58,7 +58,7 @@ pub fn hostile_sys(
                 // Just a quick test nothing fancy but even with 800 entities this run taking only
                 // a microsec probably even less that's crazy
                 log!("yep");
-                break;
+                continue;
             }
         }
     }
