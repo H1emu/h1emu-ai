@@ -2,7 +2,10 @@ use bevy_ecs::prelude::*;
 use js_sys::Float32Array;
 use wasm_bindgen::JsValue;
 
-use crate::components::{H1emuEntity, PlayerEntity, Position, ZombieEntity};
+use crate::{
+    components::{H1emuEntity, PlayerEntity, Position, ZombieEntity},
+    log,
+};
 
 pub fn track_players_pos(
     mut player_query: Query<(&H1emuEntity, &mut Position), With<PlayerEntity>>,
@@ -33,6 +36,30 @@ pub fn test_follow(
             let js_pos = Float32Array::new(&jspa);
             args.push(&js_pos);
             obj.call_method(method, &args);
+        }
+    }
+}
+pub fn is_pos_in_radius(radius: f32, player_pos: &Position, enemi_pos: &Position) -> bool {
+    let player_x = player_pos.x;
+    let player_z = player_pos.z;
+    let enemi_x = enemi_pos.x;
+    let enemi_z = enemi_pos.z;
+    (player_x - radius <= enemi_x && enemi_x <= player_x + radius)
+        && (player_z - radius <= enemi_z && enemi_z <= player_z + radius)
+}
+pub fn hostile_sys(
+    mut all_positions_query: Query<(&H1emuEntity, &Position), With<PlayerEntity>>,
+    mut hostile_query: Query<(&H1emuEntity, &Position), With<ZombieEntity>>,
+) {
+    for (hostile_ent, hostile_pos) in &mut hostile_query {
+        for (player_ent, player_pos) in &mut all_positions_query {
+            // let hostile_pos = hostile_ent.get_position();
+            if is_pos_in_radius(2.0, &player_pos, &hostile_pos) {
+                // Just a quick test nothing fancy but even with 800 entities this run taking only
+                // a microsec probably even less that's crazy
+                log!("yep");
+                break;
+            }
         }
     }
 }

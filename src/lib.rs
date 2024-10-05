@@ -2,7 +2,7 @@ use std::sync::{atomic::AtomicPtr, Arc};
 
 use bevy_ecs::prelude::*;
 use components::{DeerEntity, EntityDefaultBundle, H1emuEntity, PlayerEntity, ZombieEntity};
-use systems::{test_follow, track_players_pos};
+use systems::{hostile_sys, test_follow, track_players_pos};
 use wasm_bindgen::prelude::*;
 
 mod components;
@@ -33,8 +33,7 @@ pub enum EntityType {
 
 #[wasm_bindgen]
 pub struct Stats {
-    pub zombies: u32,
-    pub players: u32,
+    pub entities: u32,
 }
 
 #[wasm_bindgen]
@@ -50,12 +49,15 @@ impl AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
         schedule.add_systems(track_players_pos);
+        schedule.add_systems(hostile_sys);
 
         AiManager { world, schedule }
     }
 
     pub fn get_stats(&mut self) -> Stats {
-        todo!()
+        Stats {
+            entities: self.world.entities().len(),
+        }
     }
 
     pub fn run(&mut self) {
