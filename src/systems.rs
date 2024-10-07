@@ -49,13 +49,15 @@ pub fn hostile_to_player_sys(
     mut all_positions_query: Query<(&H1emuEntity, &Position), With<PlayerEntity>>,
     mut hostile_query: Query<(&H1emuEntity, &Position), With<HostileToPlayer>>,
 ) {
+    let method = &JsValue::from_str("attack");
     for (hostile_ent, hostile_pos) in &mut hostile_query {
         for (player_ent, player_pos) in &mut all_positions_query {
             // let hostile_pos = hostile_ent.get_position();
             if is_pos_in_radius(2.0, &player_pos, &hostile_pos) {
                 // Just a quick test nothing fancy but even with 800 entities this run taking only
                 // a microsec probably even less that's crazy
-                log!("attack");
+                let args = js_sys::Array::new();
+                hostile_ent.call_method(method, &args);
                 break;
             }
         }
