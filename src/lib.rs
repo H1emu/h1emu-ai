@@ -5,7 +5,7 @@ use components::{
     BearEntity, Coward, DeerEntity, EntityDefaultBundle, H1emuEntity, HostileToPlayer,
     PlayerEntity, WolfEntity, ZombieEntity,
 };
-use systems::{coward_sys, hostile_to_player_sys, test_follow, track_positions};
+use systems::{attack_hit_sys, coward_sys, hostile_to_player_sys, test_follow, track_positions};
 use wasm_bindgen::prelude::*;
 
 mod components;
@@ -40,6 +40,7 @@ impl AiManager {
         let mut schedule = Schedule::default();
         schedule.add_systems(track_positions);
         schedule.add_systems(hostile_to_player_sys);
+        schedule.add_systems(attack_hit_sys);
         schedule.add_systems(coward_sys);
 
         AiManager { world, schedule }

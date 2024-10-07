@@ -4,10 +4,10 @@ use std::sync::{
 };
 
 use bevy_ecs::prelude::*;
-use js_sys::{Array, Float32Array, Function, Object, Reflect};
+use js_sys::{Array, Float32Array, Function, JsString, Object, Reflect};
 use wasm_bindgen::JsValue;
 
-use crate::log;
+use crate::{error, log};
 
 #[derive(Component, Default)]
 pub struct H1emuEntity(pub Arc<AtomicPtr<js_sys::Object>>);
@@ -52,12 +52,22 @@ impl H1emuEntity {
             z: vec[2],
         }
     }
+    pub fn get_characterId(&self) -> String {
+        let js_value = self
+            .get_property(vec![&JsValue::from_str("characterId")])
+            .unwrap();
+
+        JsString::from(js_value).into()
+    }
     pub fn get_property(&self, property_chain: Vec<&JsValue>) -> Result<JsValue, ()> {
         let mut current_obj = self.get_object().unwrap().to_owned();
-        for property in property_chain {
-            let property = Reflect::get(&current_obj, property).unwrap();
+        for property_name in property_chain {
+            let property = Reflect::get(&current_obj, property_name).unwrap();
             if property.is_undefined() {
-                log!("specified property doesn't exist");
+                error!(format!(
+                    "specified property {:?} doesn't exist",
+                    property_name
+                ));
                 break;
                 // Err(())
             } else {
@@ -92,6 +102,16 @@ pub struct Position {
 pub struct HostileToPlayer();
 #[derive(Component)]
 pub struct Coward();
+
+#[derive(Component)]
+pub struct IsAttacking {
+    pub target: Entity,
+    pub target_character_id: String,
+    pub time_to_hit: i64,
+}
+
+#[derive(Component, Clone)]
+pub struct CharacterId(String);
 
 #[derive(Component)]
 pub struct ZombieEntity();

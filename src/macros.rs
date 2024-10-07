@@ -11,3 +11,10 @@ macro_rules! log {
 macro_rules! log {
     ($($t:tt)*) => {};
 }
+
+#[macro_export]
+macro_rules! error{
+    ($($t:tt)*) => {
+        web_sys::console::log_1(&format!("{:?}",$($t)*).into())
+    };
+}
