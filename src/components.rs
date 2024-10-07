@@ -89,11 +89,20 @@ pub struct Position {
 }
 
 #[derive(Component)]
+pub struct HostileToPlayer();
+#[derive(Component)]
+pub struct Coward();
+
+#[derive(Component)]
 pub struct ZombieEntity();
 #[derive(Component)]
 pub struct PlayerEntity();
 #[derive(Component)]
 pub struct DeerEntity();
+#[derive(Component)]
+pub struct WolfEntity();
+#[derive(Component)]
+pub struct BearEntity();
 
 #[derive(Bundle, Default)]
 pub struct EntityDefaultBundle {

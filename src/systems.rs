@@ -3,18 +3,16 @@ use js_sys::Float32Array;
 use wasm_bindgen::JsValue;
 
 use crate::{
-    components::{H1emuEntity, PlayerEntity, Position, ZombieEntity},
+    components::{Coward, H1emuEntity, HostileToPlayer, PlayerEntity, Position, ZombieEntity},
     log,
 };
 
-pub fn track_players_pos(
-    mut player_query: Query<(&H1emuEntity, &mut Position), With<PlayerEntity>>,
-) {
-    for (player, mut player_position) in &mut player_query {
-        let pos = player.get_position();
-        player_position.x = pos.x;
-        player_position.y = pos.y;
-        player_position.z = pos.z;
+pub fn track_positions(mut query: Query<(&H1emuEntity, &mut Position), With<PlayerEntity>>) {
+    for (entity, mut position) in &mut query {
+        let pos = entity.get_position();
+        position.x = pos.x;
+        position.y = pos.y;
+        position.z = pos.z;
         // log!(player_position);
     }
 }
@@ -47,9 +45,9 @@ pub fn is_pos_in_radius(radius: f32, player_pos: &Position, enemi_pos: &Position
     (player_x - radius <= enemi_x && enemi_x <= player_x + radius)
         && (player_z - radius <= enemi_z && enemi_z <= player_z + radius)
 }
-pub fn hostile_sys(
+pub fn hostile_to_player_sys(
     mut all_positions_query: Query<(&H1emuEntity, &Position), With<PlayerEntity>>,
-    mut hostile_query: Query<(&H1emuEntity, &Position), With<ZombieEntity>>,
+    mut hostile_query: Query<(&H1emuEntity, &Position), With<HostileToPlayer>>,
 ) {
     for (hostile_ent, hostile_pos) in &mut hostile_query {
         for (player_ent, player_pos) in &mut all_positions_query {
@@ -57,8 +55,22 @@ pub fn hostile_sys(
             if is_pos_in_radius(2.0, &player_pos, &hostile_pos) {
                 // Just a quick test nothing fancy but even with 800 entities this run taking only
                 // a microsec probably even less that's crazy
-                log!("yep");
-                continue;
+                log!("attack");
+                break;
+            }
+        }
+    }
+}
+
+pub fn coward_sys(
+    mut coward_query: Query<(&H1emuEntity, &Position), With<Coward>>,
+    mut others_query: Query<&Position, Without<Coward>>,
+) {
+    for (coward_ent, coward_pos) in &mut coward_query {
+        for other_pos in &mut others_query {
+            if is_pos_in_radius(2.0, &other_pos, &coward_pos) {
+                log!("i'm afraid");
+                break;
             }
         }
     }

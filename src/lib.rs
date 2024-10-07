@@ -1,8 +1,11 @@
 use std::sync::{atomic::AtomicPtr, Arc};
 
 use bevy_ecs::prelude::*;
-use components::{DeerEntity, EntityDefaultBundle, H1emuEntity, PlayerEntity, ZombieEntity};
-use systems::{hostile_sys, test_follow, track_players_pos};
+use components::{
+    BearEntity, Coward, DeerEntity, EntityDefaultBundle, H1emuEntity, HostileToPlayer,
+    PlayerEntity, WolfEntity, ZombieEntity,
+};
+use systems::{coward_sys, hostile_to_player_sys, test_follow, track_positions};
 use wasm_bindgen::prelude::*;
 
 mod components;
@@ -10,25 +13,12 @@ mod macros;
 mod systems;
 
 #[wasm_bindgen]
-pub struct EntityFromJs {
-    h1emu_id: js_sys::Object,
-    entity_type: EntityType,
-}
-#[wasm_bindgen]
-impl EntityFromJs {
-    #[wasm_bindgen(constructor)]
-    pub fn new(entity_type: EntityType, h1emu_id: js_sys::Object) -> EntityFromJs {
-        EntityFromJs {
-            h1emu_id,
-            entity_type,
-        }
-    }
-}
-#[wasm_bindgen]
 pub enum EntityType {
     Zombie,
     Player,
     Deer,
+    Wolf,
+    Bear,
 }
 
 #[wasm_bindgen]
@@ -48,8 +38,9 @@ impl AiManager {
     pub fn initialize() -> AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
-        schedule.add_systems(track_players_pos);
-        schedule.add_systems(hostile_sys);
+        schedule.add_systems(track_positions);
+        schedule.add_systems(hostile_to_player_sys);
+        schedule.add_systems(coward_sys);
 
         AiManager { world, schedule }
     }
@@ -63,8 +54,8 @@ impl AiManager {
     pub fn run(&mut self) {
         self.schedule.run(&mut self.world);
     }
-    pub fn add_entity(&mut self, e: EntityFromJs) {
-        let h1emu_entity = Box::into_raw(Box::new(e.h1emu_id));
+    pub fn add_entity(&mut self, e: js_sys::Object, entity_type: EntityType) {
+        let h1emu_entity = Box::into_raw(Box::new(e));
         let h1emu_entity_ptr = Arc::new(AtomicPtr::new(h1emu_entity));
         let h1emu_entity_component = H1emuEntity(h1emu_entity_ptr);
         let position = h1emu_entity_component.get_position();
@@ -73,10 +64,12 @@ impl AiManager {
             position,
             ..Default::default()
         });
-        match e.entity_type {
+        match entity_type {
             EntityType::Player => entity.insert(PlayerEntity {}),
-            EntityType::Zombie => entity.insert(ZombieEntity {}),
-            EntityType::Deer => entity.insert(DeerEntity {}),
+            EntityType::Zombie => entity.insert((ZombieEntity {}, HostileToPlayer {})),
+            EntityType::Wolf => entity.insert((WolfEntity {}, HostileToPlayer {})),
+            EntityType::Bear => entity.insert((BearEntity {}, HostileToPlayer {})),
+            EntityType::Deer => entity.insert((DeerEntity {}, Coward {})),
         };
     }
 }
