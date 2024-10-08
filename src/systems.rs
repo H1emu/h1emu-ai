@@ -7,10 +7,11 @@ use wasm_bindgen::JsValue;
 
 use crate::{
     components::{
-        Alive, CharacterId, Coward, Dead, Eating, H1emuEntity, HostileToPlayer, HungerLevel,
-        Hungry, IsAttacking, PlayerEntity, Position, ZombieEntity,
+        Alive, Carnivore, CharacterId, Coward, Dead, Eating, H1emuEntity, HostileToPlayer,
+        HungerLevel, Hungry, IsAttacking, PlayerEntity, Position, ZombieEntity,
     },
     error, log,
+    ressources::HungerTimer,
 };
 
 pub fn track_positions(
@@ -114,7 +115,7 @@ pub fn attack_hit_sys(
 }
 
 pub fn coward_sys(
-    mut coward_query: Query<(&H1emuEntity, &Position), With<Coward>>,
+    mut coward_query: Query<(&H1emuEntity, &Position), (With<Coward>, With<Alive>)>,
     mut others_query: Query<&Position, (Without<Coward>, With<Alive>)>,
 ) {
     for (coward_ent, coward_pos) in &mut coward_query {
@@ -140,27 +141,37 @@ pub fn check_aliveness_sys(
     }
 }
 
-pub fn zombie_eating_sys(
+pub fn check_player_revived_sys(
+    mut query: Query<(&H1emuEntity, Entity), With<Dead>>,
+
+    mut commands: Commands,
+) {
+    for (h1emu_ent, ent) in &mut query {
+        if h1emu_ent.get_isAlive() {
+            commands.entity(ent).remove::<Dead>();
+            commands.entity(ent).insert(Alive());
+        }
+    }
+}
+
+pub fn carnivore_eating_sys(
     mut dead_query: Query<(&Position, Entity), (With<Dead>, With<PlayerEntity>)>,
     mut zombie_query: Query<
         (&H1emuEntity, &Position, Entity),
-        (
-            With<ZombieEntity>,
-            With<Alive>,
-            Without<Eating>,
-            With<Hungry>,
-        ),
+        (With<Carnivore>, With<Alive>, Without<Eating>, With<Hungry>),
     >,
     mut commands: Commands,
 ) {
     for (dead_pos, dead_ent) in &mut dead_query {
         for (h1emu_ent, zombie_pos, ent) in &mut zombie_query {
-            let args = js_sys::Array::new();
-            args.push(&JsValue::from_str("Eating"));
-            h1emu_ent.play_animation(&args);
+            if is_pos_in_radius(1.5, dead_pos, zombie_pos) {
+                let args = js_sys::Array::new();
+                args.push(&JsValue::from_str("Eating"));
+                h1emu_ent.play_animation(&args);
 
-            let current_time = Utc::now().timestamp_millis();
-            commands.entity(ent).insert(Eating { time: current_time });
+                let current_time = Utc::now().timestamp_millis();
+                commands.entity(ent).insert(Eating { time: current_time });
+            }
         }
     }
 }
@@ -171,7 +182,8 @@ pub fn finish_eating_sys(
 ) {
     let current_time = Utc::now().timestamp_millis();
     for (h1emu_ent, ent, eating, mut hunger_level) in &mut query {
-        if eating.time > current_time + 3000_i64 {
+        if eating.time + 10000_i64 <= current_time {
+            log!("finish eating");
             let args = js_sys::Array::new();
             args.push(&JsValue::from_str("EatingDone"));
             h1emu_ent.play_animation(&args);
@@ -181,17 +193,34 @@ pub fn finish_eating_sys(
     }
 }
 
-pub fn hunger_sys(mut query: Query<(Entity, &HungerLevel), With<Alive>>, mut commands: Commands) {
+pub fn hungry_sys(mut query: Query<(Entity, &HungerLevel), With<Alive>>, mut commands: Commands) {
     for (ent, hunger_level) in &mut query {
         if hunger_level.0 < 10 {
             commands.entity(ent).insert(Hungry());
         }
     }
 }
-pub fn hungry_sys(mut query: Query<&mut HungerLevel, With<Alive>>) {
-    for mut hunger_level in &mut query {
-        if hunger_level.0 > 0 {
-            hunger_level.0 = hunger_level.0 - 1;
+pub fn remove_hungry_sys(
+    mut query: Query<(Entity, &HungerLevel), (With<Alive>, With<Hungry>)>,
+    mut commands: Commands,
+) {
+    for (ent, hunger_level) in &mut query {
+        if hunger_level.0 > 50 {
+            commands.entity(ent).remove::<Hungry>();
         }
+    }
+}
+pub fn hunger_sys(
+    mut query: Query<&mut HungerLevel, (With<Alive>)>,
+    mut hunger_timer: ResMut<HungerTimer>,
+) {
+    let current_time = Utc::now().timestamp_millis();
+    if hunger_timer.0 <= current_time {
+        for mut hunger_level in &mut query {
+            if hunger_level.0 > 0 {
+                hunger_level.0 = hunger_level.0 - 1;
+            }
+        }
+        hunger_timer.0 = current_time + 10_000;
     }
 }

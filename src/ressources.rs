@@ -1,5 +1,4 @@
-use bevy_ecs::component::Component;
-use bevy_time::Timer;
+use bevy_ecs::{component::Component, system::Resource};
 
-#[derive(Component)]
-pub struct HungerTimer(Timer);
+#[derive(Resource)]
+pub struct HungerTimer(pub i64);

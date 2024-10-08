@@ -1,14 +1,16 @@
 use std::sync::{atomic::AtomicPtr, Arc};
 
 use bevy_ecs::prelude::*;
+use chrono::Utc;
 use components::{
-    BearEntity, Coward, DeerEntity, EntityDefaultBundle, H1emuEntity, HostileToPlayer,
+    BearEntity, Carnivore, Coward, DeerEntity, EntityDefaultBundle, H1emuEntity, HostileToPlayer,
     PlayerEntity, WolfEntity, ZombieEntity,
 };
 use ressources::HungerTimer;
 use systems::{
-    attack_hit_sys, check_aliveness_sys, coward_sys, finish_eating_sys, hostile_to_player_sys,
-    hunger_sys, hungry_sys, test_follow, track_positions, zombie_eating_sys,
+    attack_hit_sys, carnivore_eating_sys, check_aliveness_sys, check_player_revived_sys,
+    coward_sys, finish_eating_sys, hostile_to_player_sys, hunger_sys, hungry_sys,
+    remove_hungry_sys, test_follow, track_positions,
 };
 use wasm_bindgen::prelude::*;
 
@@ -24,6 +26,7 @@ pub enum EntityType {
     Deer,
     Wolf,
     Bear,
+    Screamer,
 }
 
 #[wasm_bindgen]
@@ -41,16 +44,18 @@ pub struct AiManager {
 impl AiManager {
     #[wasm_bindgen(constructor)]
     pub fn initialize() -> AiManager {
-        let world = World::new();
+        let mut world = World::new();
         let mut schedule = Schedule::default();
-        // world.insert_resource(HungerTimer());
+        world.insert_resource(HungerTimer(Utc::now().timestamp_millis()));
         schedule.add_systems(track_positions);
         schedule.add_systems(check_aliveness_sys);
-        schedule.add_systems(hunger_sys);
+        schedule.add_systems(check_player_revived_sys);
         schedule.add_systems(hungry_sys);
+        schedule.add_systems(remove_hungry_sys);
+        schedule.add_systems(hunger_sys);
         schedule.add_systems(hostile_to_player_sys);
         schedule.add_systems(attack_hit_sys);
-        schedule.add_systems(zombie_eating_sys);
+        schedule.add_systems(carnivore_eating_sys);
         schedule.add_systems(finish_eating_sys);
         schedule.add_systems(coward_sys);
 
@@ -78,7 +83,10 @@ impl AiManager {
         });
         match entity_type {
             EntityType::Player => entity.insert(PlayerEntity {}),
-            EntityType::Zombie => entity.insert((ZombieEntity {}, HostileToPlayer {})),
+            EntityType::Zombie => {
+                entity.insert((ZombieEntity {}, HostileToPlayer {}, Carnivore {}))
+            }
+            EntityType::Screamer => entity.insert((ZombieEntity {}, HostileToPlayer {})),
             EntityType::Wolf => entity.insert((WolfEntity {}, HostileToPlayer {})),
             EntityType::Bear => entity.insert((BearEntity {}, HostileToPlayer {})),
             EntityType::Deer => entity.insert((DeerEntity {}, Coward {})),

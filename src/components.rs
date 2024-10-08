@@ -141,6 +141,8 @@ pub struct HungerLevel(pub u8);
 #[derive(Component)]
 pub struct Hungry();
 #[derive(Component)]
+pub struct Carnivore();
+#[derive(Component)]
 pub struct ZombieEntity();
 #[derive(Component)]
 pub struct PlayerEntity();
