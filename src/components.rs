@@ -1,6 +1,9 @@
-use std::sync::{
-    atomic::{AtomicPtr, Ordering},
-    Arc,
+use std::{
+    default,
+    sync::{
+        atomic::{AtomicPtr, Ordering},
+        Arc,
+    },
 };
 
 use bevy_ecs::prelude::*;
@@ -59,6 +62,13 @@ impl H1emuEntity {
 
         JsString::from(js_value).into()
     }
+    pub fn get_isAlive(&self) -> bool {
+        let js_value = self
+            .get_property(vec![&JsValue::from_str("isAlive")])
+            .unwrap();
+
+        js_sys::Boolean::from(js_value).into()
+    }
     pub fn get_property(&self, property_chain: Vec<&JsValue>) -> Result<JsValue, ()> {
         let mut current_obj = self.get_object().unwrap().to_owned();
         for property_name in property_chain {
@@ -79,6 +89,10 @@ impl H1emuEntity {
         } else {
             Err(())
         }
+    }
+    pub fn play_animation(&self, args: &Array) {
+        let method = &JsValue::from_str("playAnimation");
+        self.call_method(method, args);
     }
     pub fn call_method(&self, method: &JsValue, args: &Array) {
         let obj = self.get_object().unwrap();
@@ -113,6 +127,19 @@ pub struct IsAttacking {
 #[derive(Component, Clone)]
 pub struct CharacterId(String);
 
+#[derive(Component, Default)]
+pub struct Alive();
+#[derive(Component)]
+pub struct Dead();
+
+#[derive(Component)]
+pub struct Eating {
+    pub time: i64,
+}
+#[derive(Component, Default)]
+pub struct HungerLevel(pub u8);
+#[derive(Component)]
+pub struct Hungry();
 #[derive(Component)]
 pub struct ZombieEntity();
 #[derive(Component)]
@@ -128,4 +155,6 @@ pub struct BearEntity();
 pub struct EntityDefaultBundle {
     pub h1emu_entity: H1emuEntity,
     pub position: Position,
+    pub alive: Alive,
+    pub hunger_level: HungerLevel,
 }

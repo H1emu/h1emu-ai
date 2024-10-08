@@ -5,11 +5,16 @@ use components::{
     BearEntity, Coward, DeerEntity, EntityDefaultBundle, H1emuEntity, HostileToPlayer,
     PlayerEntity, WolfEntity, ZombieEntity,
 };
-use systems::{attack_hit_sys, coward_sys, hostile_to_player_sys, test_follow, track_positions};
+use ressources::HungerTimer;
+use systems::{
+    attack_hit_sys, check_aliveness_sys, coward_sys, finish_eating_sys, hostile_to_player_sys,
+    hunger_sys, hungry_sys, test_follow, track_positions, zombie_eating_sys,
+};
 use wasm_bindgen::prelude::*;
 
 mod components;
 mod macros;
+mod ressources;
 mod systems;
 
 #[wasm_bindgen]
@@ -38,9 +43,15 @@ impl AiManager {
     pub fn initialize() -> AiManager {
         let world = World::new();
         let mut schedule = Schedule::default();
+        // world.insert_resource(HungerTimer());
         schedule.add_systems(track_positions);
+        schedule.add_systems(check_aliveness_sys);
+        schedule.add_systems(hunger_sys);
+        schedule.add_systems(hungry_sys);
         schedule.add_systems(hostile_to_player_sys);
         schedule.add_systems(attack_hit_sys);
+        schedule.add_systems(zombie_eating_sys);
+        schedule.add_systems(finish_eating_sys);
         schedule.add_systems(coward_sys);
 
         AiManager { world, schedule }

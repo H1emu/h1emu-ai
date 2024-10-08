@@ -7,13 +7,15 @@ use wasm_bindgen::JsValue;
 
 use crate::{
     components::{
-        CharacterId, Coward, H1emuEntity, HostileToPlayer, IsAttacking, PlayerEntity, Position,
-        ZombieEntity,
+        Alive, CharacterId, Coward, Dead, Eating, H1emuEntity, HostileToPlayer, HungerLevel,
+        Hungry, IsAttacking, PlayerEntity, Position, ZombieEntity,
     },
     error, log,
 };
 
-pub fn track_positions(mut query: Query<(&H1emuEntity, &mut Position), With<PlayerEntity>>) {
+pub fn track_positions(
+    mut query: Query<(&H1emuEntity, &mut Position), (With<PlayerEntity>, With<Alive>)>,
+) {
     for (entity, mut position) in &mut query {
         let pos = entity.get_position();
         position.x = pos.x;
@@ -54,12 +56,14 @@ pub fn is_pos_in_radius(radius: f32, player_pos: &Position, enemi_pos: &Position
 pub fn hostile_to_player_sys(
     mut hostile_query: Query<
         (&H1emuEntity, &Position, Entity),
-        (With<HostileToPlayer>, Without<IsAttacking>),
+        (With<HostileToPlayer>, Without<IsAttacking>, With<Alive>),
     >,
-    mut all_positions_query: Query<(Entity, &Position, &H1emuEntity), With<PlayerEntity>>,
+    mut all_positions_query: Query<
+        (Entity, &Position, &H1emuEntity),
+        (With<PlayerEntity>, With<Alive>),
+    >,
     mut commands: Commands,
 ) {
-    let method = &JsValue::from_str("attack");
     for (hostile_h1emu_ent, hostile_pos, hostile_ent) in &mut hostile_query {
         for (player_ent, player_pos, player_h1emu_ent) in &mut all_positions_query {
             // let hostile_pos = hostile_ent.get_position();
@@ -67,7 +71,8 @@ pub fn hostile_to_player_sys(
                 // Just a quick test nothing fancy but even with 800 entities this run taking only
                 // a microsec probably even less that's crazy
                 let args = js_sys::Array::new();
-                hostile_h1emu_ent.call_method(method, &args);
+                args.push(&JsValue::from_str("KnifeSlash"));
+                hostile_h1emu_ent.play_animation(&args);
                 let mut ec = commands.get_entity(hostile_ent).unwrap();
                 let current_time = Utc::now().timestamp_millis();
                 ec.insert(IsAttacking {
@@ -81,8 +86,8 @@ pub fn hostile_to_player_sys(
     }
 }
 pub fn attack_hit_sys(
-    mut query: Query<(&IsAttacking, Entity, &H1emuEntity, &Position)>,
-    pos_query: Query<&Position>,
+    mut query: Query<(&IsAttacking, Entity, &H1emuEntity, &Position), With<Alive>>,
+    pos_query: Query<&Position, With<Alive>>,
     mut commands: Commands,
 ) {
     let current_time = Utc::now().timestamp_millis();
@@ -110,7 +115,7 @@ pub fn attack_hit_sys(
 
 pub fn coward_sys(
     mut coward_query: Query<(&H1emuEntity, &Position), With<Coward>>,
-    mut others_query: Query<&Position, Without<Coward>>,
+    mut others_query: Query<&Position, (Without<Coward>, With<Alive>)>,
 ) {
     for (coward_ent, coward_pos) in &mut coward_query {
         for other_pos in &mut others_query {
@@ -118,6 +123,75 @@ pub fn coward_sys(
                 log!("i'm afraid");
                 break;
             }
+        }
+    }
+}
+
+pub fn check_aliveness_sys(
+    mut query: Query<(&H1emuEntity, Entity), With<Alive>>,
+
+    mut commands: Commands,
+) {
+    for (h1emu_ent, ent) in &mut query {
+        if !h1emu_ent.get_isAlive() {
+            commands.entity(ent).remove::<Alive>();
+            commands.entity(ent).insert(Dead());
+        }
+    }
+}
+
+pub fn zombie_eating_sys(
+    mut dead_query: Query<(&Position, Entity), (With<Dead>, With<PlayerEntity>)>,
+    mut zombie_query: Query<
+        (&H1emuEntity, &Position, Entity),
+        (
+            With<ZombieEntity>,
+            With<Alive>,
+            Without<Eating>,
+            With<Hungry>,
+        ),
+    >,
+    mut commands: Commands,
+) {
+    for (dead_pos, dead_ent) in &mut dead_query {
+        for (h1emu_ent, zombie_pos, ent) in &mut zombie_query {
+            let args = js_sys::Array::new();
+            args.push(&JsValue::from_str("Eating"));
+            h1emu_ent.play_animation(&args);
+
+            let current_time = Utc::now().timestamp_millis();
+            commands.entity(ent).insert(Eating { time: current_time });
+        }
+    }
+}
+
+pub fn finish_eating_sys(
+    mut query: Query<(&H1emuEntity, Entity, &Eating, &mut HungerLevel), With<Alive>>,
+    mut commands: Commands,
+) {
+    let current_time = Utc::now().timestamp_millis();
+    for (h1emu_ent, ent, eating, mut hunger_level) in &mut query {
+        if eating.time > current_time + 3000_i64 {
+            let args = js_sys::Array::new();
+            args.push(&JsValue::from_str("EatingDone"));
+            h1emu_ent.play_animation(&args);
+            commands.entity(ent).remove::<Eating>();
+            hunger_level.0 = 100;
+        }
+    }
+}
+
+pub fn hunger_sys(mut query: Query<(Entity, &HungerLevel), With<Alive>>, mut commands: Commands) {
+    for (ent, hunger_level) in &mut query {
+        if hunger_level.0 < 10 {
+            commands.entity(ent).insert(Hungry());
+        }
+    }
+}
+pub fn hungry_sys(mut query: Query<&mut HungerLevel, With<Alive>>) {
+    for mut hunger_level in &mut query {
+        if hunger_level.0 > 0 {
+            hunger_level.0 = hunger_level.0 - 1;
         }
     }
 }
