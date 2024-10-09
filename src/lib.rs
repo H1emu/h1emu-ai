@@ -71,7 +71,7 @@ impl AiManager {
     pub fn run(&mut self) {
         self.schedule.run(&mut self.world);
     }
-    pub fn add_entity(&mut self, e: js_sys::Object, entity_type: EntityType) {
+    pub fn add_entity(&mut self, e: js_sys::Object, entity_type: EntityType) -> u64 {
         let h1emu_entity = Box::into_raw(Box::new(e));
         let h1emu_entity_ptr = Arc::new(AtomicPtr::new(h1emu_entity));
         let h1emu_entity_component = H1emuEntity(h1emu_entity_ptr);
@@ -91,5 +91,10 @@ impl AiManager {
             EntityType::Bear => entity.insert((BearEntity {}, HostileToPlayer {})),
             EntityType::Deer => entity.insert((DeerEntity {}, Coward {})),
         };
+        entity.id().to_bits()
+    }
+    pub fn remove_entity(&mut self, entity_id_bits: u64) {
+        let e = Entity::from_bits(entity_id_bits);
+        self.world.despawn(e);
     }
 }

@@ -107,7 +107,7 @@ pub fn attack_hit_sys(
                 attacker_h1emu_ent.call_method(method, &args);
             }
         } else {
-            error!("Failed to get target position, attack canceled");
+            log!("Failed to get target position, attack canceled");
         }
 
         commands.entity(attack_ent).remove::<IsAttacking>();
