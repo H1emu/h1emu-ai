@@ -87,7 +87,7 @@ impl AiManager {
                 ZombieEntity {},
                 HostileToPlayer {},
                 Carnivore {},
-                HungerLevel(20),
+                HungerLevel(0),
             )),
             EntityType::Screamer => entity.insert((ZombieEntity {}, HostileToPlayer {})),
             EntityType::Wolf => entity.insert((WolfEntity {}, HostileToPlayer {})),
