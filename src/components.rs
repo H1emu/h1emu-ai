@@ -177,6 +177,4 @@ pub struct EntityDefaultBundle {
     pub h1emu_entity: H1emuEntity,
     pub position: Position,
     pub alive: Alive,
-    // TODO: players should not have that
-    pub hunger_level: HungerLevel,
 }

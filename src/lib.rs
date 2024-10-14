@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use chrono::Utc;
 use components::{
     BearEntity, Carnivore, Coward, DeerEntity, EntityDefaultBundle, H1emuEntity, HostileToPlayer,
-    PlayerEntity, WolfEntity, ZombieEntity,
+    HungerLevel, PlayerEntity, WolfEntity, ZombieEntity,
 };
 use ressources::HungerTimer;
 use systems::{
@@ -83,9 +83,12 @@ impl AiManager {
         });
         match entity_type {
             EntityType::Player => entity.insert(PlayerEntity {}),
-            EntityType::Zombie => {
-                entity.insert((ZombieEntity {}, HostileToPlayer {}, Carnivore {}))
-            }
+            EntityType::Zombie => entity.insert((
+                ZombieEntity {},
+                HostileToPlayer {},
+                Carnivore {},
+                HungerLevel(20),
+            )),
             EntityType::Screamer => entity.insert((ZombieEntity {}, HostileToPlayer {})),
             EntityType::Wolf => entity.insert((WolfEntity {}, HostileToPlayer {})),
             EntityType::Bear => entity.insert((BearEntity {}, HostileToPlayer {})),
