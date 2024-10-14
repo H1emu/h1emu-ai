@@ -30,7 +30,6 @@ pub fn test_follow(
     mut zombie_query: Query<&H1emuEntity, With<ZombieEntity>>,
     mut player_query: Query<&H1emuEntity, With<PlayerEntity>>,
 ) {
-    let method = &JsValue::from_str("goTo");
     for obj in &mut zombie_query {
         for player in &mut player_query {
             let pos = player.get_position();
@@ -42,7 +41,7 @@ pub fn test_follow(
 
             let js_pos = Float32Array::new(&jspa);
             args.push(&js_pos);
-            obj.call_method(method, &args);
+            obj.go_to(&args);
         }
     }
 }
@@ -92,7 +91,6 @@ pub fn attack_hit_sys(
     mut commands: Commands,
 ) {
     let current_time = Utc::now().timestamp_millis();
-    let method = &JsValue::from_str("applyDamage");
     for (attack, attack_ent, attacker_h1emu_ent, attacker_pos) in &mut query {
         if current_time < attack.time_to_hit {
             continue;
@@ -104,7 +102,7 @@ pub fn attack_hit_sys(
                 let args = js_sys::Array::new();
                 let character_id_jsvalue: JsValue = attack.target_character_id.clone().into();
                 args.push(&character_id_jsvalue);
-                attacker_h1emu_ent.call_method(method, &args);
+                attacker_h1emu_ent.apply_damage(&args);
             }
         } else {
             log!("Failed to get target position, attack canceled");

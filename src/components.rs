@@ -12,6 +12,17 @@ use wasm_bindgen::JsValue;
 
 use crate::{error, log};
 
+pub struct Bindings {
+    pub go_to: &'static str,
+    pub apply_damage: &'static str,
+    pub play_animation: &'static str,
+}
+const BINDINGS: Bindings = Bindings {
+    go_to: "goTo",
+    apply_damage: "applyDamage",
+    play_animation: "playAnimation",
+};
+
 #[derive(Component, Default)]
 pub struct H1emuEntity(pub Arc<AtomicPtr<js_sys::Object>>);
 impl H1emuEntity {
@@ -69,7 +80,7 @@ impl H1emuEntity {
 
         js_sys::Boolean::from(js_value).into()
     }
-    pub fn get_property(&self, property_chain: Vec<&JsValue>) -> Result<JsValue, ()> {
+    fn get_property(&self, property_chain: Vec<&JsValue>) -> Result<JsValue, ()> {
         let mut current_obj = self.get_object().unwrap().to_owned();
         for property_name in property_chain {
             let property = Reflect::get(&current_obj, property_name).unwrap();
@@ -91,10 +102,18 @@ impl H1emuEntity {
         }
     }
     pub fn play_animation(&self, args: &Array) {
-        let method = &JsValue::from_str("playAnimation");
+        let method = &JsValue::from_str(BINDINGS.play_animation);
         self.call_method(method, args);
     }
-    pub fn call_method(&self, method: &JsValue, args: &Array) {
+    pub fn go_to(&self, args: &Array) {
+        let method = &JsValue::from_str(BINDINGS.go_to);
+        self.call_method(method, args);
+    }
+    pub fn apply_damage(&self, args: &Array) {
+        let method = &JsValue::from_str(BINDINGS.apply_damage);
+        self.call_method(method, args);
+    }
+    fn call_method(&self, method: &JsValue, args: &Array) {
         let obj = self.get_object().unwrap();
         let func: Function = Function::from(Reflect::get(obj, method).unwrap());
         if func.is_function() {
@@ -158,5 +177,6 @@ pub struct EntityDefaultBundle {
     pub h1emu_entity: H1emuEntity,
     pub position: Position,
     pub alive: Alive,
+    // TODO: players should not have that
     pub hunger_level: HungerLevel,
 }
