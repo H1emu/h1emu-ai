@@ -1,16 +1,19 @@
-use std::sync::{atomic::AtomicPtr, Arc};
+use std::{
+    ptr::read_unaligned,
+    sync::{atomic::AtomicPtr, Arc},
+};
 
 use bevy_ecs::prelude::*;
 use chrono::Utc;
 use components::{
-    BearEntity, Carnivore, Coward, DeerEntity, EntityDefaultBundle, H1emuEntity, HostileToPlayer,
-    HungerLevel, PlayerEntity, WolfEntity, ZombieEntity,
+    BearEntity, Carnivore, Cooldown, Coward, DeerEntity, DefaultBundle, EntityDefaultBundle,
+    H1emuEntity, HostileToPlayer, HungerLevel, PlayerEntity, Trap, WolfEntity, ZombieEntity,
 };
 use ressources::HungerTimer;
 use systems::{
     attack_hit_sys, carnivore_eating_sys, check_aliveness_sys, check_player_revived_sys,
     coward_sys, finish_eating_sys, hostile_to_player_sys, hunger_sys, hungry_sys,
-    remove_hungry_sys, test_follow, track_positions,
+    remove_hungry_sys, test_follow, track_positions, trap_sys,
 };
 use wasm_bindgen::prelude::*;
 
@@ -58,6 +61,7 @@ impl AiManager {
         schedule.add_systems(carnivore_eating_sys);
         schedule.add_systems(finish_eating_sys);
         schedule.add_systems(coward_sys);
+        schedule.add_systems(trap_sys);
 
         AiManager { world, schedule }
     }
@@ -99,5 +103,22 @@ impl AiManager {
     pub fn remove_entity(&mut self, entity_id_bits: u64) {
         let e = Entity::from_bits(entity_id_bits);
         self.world.despawn(e);
+    }
+    pub fn add_trap(&mut self, e: js_sys::Object, radius: f32, cooldown: i64) -> u64 {
+        let h1emu_entity = Box::into_raw(Box::new(e));
+        let h1emu_entity_ptr = Arc::new(AtomicPtr::new(h1emu_entity));
+        let h1emu_entity_component = H1emuEntity(h1emu_entity_ptr);
+        let position = h1emu_entity_component.get_position();
+        let mut entity = self.world.spawn(DefaultBundle {
+            h1emu_entity: h1emu_entity_component,
+            position,
+            ..Default::default()
+        });
+        entity.insert(Trap(radius));
+        entity.insert(Cooldown {
+            cooldown,
+            ..Default::default()
+        });
+        entity.id().to_bits()
     }
 }

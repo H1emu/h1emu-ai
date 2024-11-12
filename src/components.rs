@@ -7,7 +7,8 @@ use std::{
 };
 
 use bevy_ecs::prelude::*;
-use js_sys::{Array, Float32Array, Function, JsString, Object, Reflect};
+use chrono::Utc;
+use js_sys::{Array, Boolean, Float32Array, Function, JsString, Object, Reflect};
 use wasm_bindgen::JsValue;
 
 use crate::{error, log};
@@ -16,11 +17,13 @@ pub struct Bindings {
     pub go_to: &'static str,
     pub apply_damage: &'static str,
     pub play_animation: &'static str,
+    pub detonate: &'static str,
 }
 const BINDINGS: Bindings = Bindings {
     go_to: "goTo",
     apply_damage: "applyDamage",
     play_animation: "playAnimation",
+    detonate: "detonate",
 };
 
 #[derive(Component, Default)]
@@ -105,6 +108,10 @@ impl H1emuEntity {
         let method = &JsValue::from_str(BINDINGS.play_animation);
         self.call_method(method, args);
     }
+    pub fn detonate(&self, args: &Array) {
+        let method = &JsValue::from_str(BINDINGS.detonate);
+        self.call_method(method, args);
+    }
     pub fn go_to(&self, args: &Array) {
         let method = &JsValue::from_str(BINDINGS.go_to);
         self.call_method(method, args);
@@ -162,6 +169,23 @@ pub struct Hungry();
 #[derive(Component)]
 pub struct Carnivore();
 #[derive(Component)]
+pub struct Trap(pub f32);
+#[derive(Component, Default)]
+pub struct Cooldown {
+    pub last: i64,
+    pub cooldown: i64,
+}
+impl Cooldown {
+    pub fn is_in_cooldown(&self) -> bool {
+        let current_time = Utc::now().timestamp_millis();
+        if current_time < self.last + self.cooldown {
+            true
+        } else {
+            false
+        }
+    }
+}
+#[derive(Component)]
 pub struct ZombieEntity();
 #[derive(Component)]
 pub struct PlayerEntity();
@@ -177,4 +201,9 @@ pub struct EntityDefaultBundle {
     pub h1emu_entity: H1emuEntity,
     pub position: Position,
     pub alive: Alive,
+}
+#[derive(Bundle, Default)]
+pub struct DefaultBundle {
+    pub h1emu_entity: H1emuEntity,
+    pub position: Position,
 }

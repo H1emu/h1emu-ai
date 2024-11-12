@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use bevy_ecs::prelude::*;
 use chrono::Utc;
 use js_sys::{Float32Array, Math::log};
@@ -7,8 +5,9 @@ use wasm_bindgen::JsValue;
 
 use crate::{
     components::{
-        Alive, Carnivore, CharacterId, Coward, Dead, Eating, H1emuEntity, HostileToPlayer,
-        HungerLevel, Hungry, IsAttacking, PlayerEntity, Position, ZombieEntity,
+        Alive, Carnivore, CharacterId, Cooldown, Coward, Dead, Eating, H1emuEntity,
+        HostileToPlayer, HungerLevel, Hungry, IsAttacking, PlayerEntity, Position, Trap,
+        ZombieEntity,
     },
     error, log,
     ressources::HungerTimer,
@@ -120,6 +119,28 @@ pub fn coward_sys(
         for other_pos in &mut others_query {
             if is_pos_in_radius(2.0, &other_pos, &coward_pos) {
                 log!("i'm afraid");
+                break;
+            }
+        }
+    }
+}
+
+pub fn trap_sys(
+    mut trap_query: Query<(&Trap, &Position, &H1emuEntity, &mut Cooldown)>,
+    mut others_query: Query<(&Position, &H1emuEntity), (With<Alive>, With<PlayerEntity>)>,
+) {
+    for (ent, pos, h1emu_ent, mut cooldown) in &mut trap_query {
+        if cooldown.is_in_cooldown() {
+            continue;
+        }
+        for (other_pos, other_h1emu_ent) in &mut others_query {
+            if is_pos_in_radius(ent.0, &other_pos, &pos) {
+                let target_character_id = other_h1emu_ent.get_characterId();
+                let args = js_sys::Array::new();
+                let character_id_jsvalue: JsValue = target_character_id.into();
+                args.push(&character_id_jsvalue);
+                cooldown.last = Utc::now().timestamp_millis();
+                h1emu_ent.detonate(&args);
                 break;
             }
         }
