@@ -13,9 +13,7 @@ use crate::{
     ressources::HungerTimer,
 };
 
-pub fn track_positions(
-    mut query: Query<(&H1emuEntity, &mut Position), (With<PlayerEntity>, With<Alive>)>,
-) {
+pub fn track_positions(mut query: Query<(&H1emuEntity, &mut Position), (With<Alive>)>) {
     for (entity, mut position) in &mut query {
         let pos = entity.get_position();
         position.x = pos.x;
