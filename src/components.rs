@@ -131,7 +131,7 @@ impl H1emuEntity {
     }
 }
 
-#[derive(Component, Debug, Default, Clone, Copy)]
+#[derive(Component, Debug, Default, Clone, Copy, PartialEq)]
 pub struct Position {
     pub x: f32,
     pub y: f32,

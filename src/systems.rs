@@ -16,10 +16,12 @@ use crate::{
 pub fn track_positions(mut query: Query<(&H1emuEntity, &mut Position), (With<Alive>)>) {
     for (entity, mut position) in &mut query {
         let pos = entity.get_position();
-        position.x = pos.x;
-        position.y = pos.y;
-        position.z = pos.z;
-        // log!(player_position);
+        if pos != position.to_owned() {
+            log!("new pos");
+            position.x = pos.x;
+            position.y = pos.y;
+            position.z = pos.z;
+        }
     }
 }
 
@@ -57,7 +59,7 @@ pub fn hostile_to_player_sys(
     >,
     mut all_positions_query: Query<
         (Entity, &Position, &H1emuEntity),
-        (With<PlayerEntity>, With<Alive>),
+        (With<PlayerEntity>, With<Alive>, Changed<Position>),
     >,
     mut commands: Commands,
 ) {
@@ -111,7 +113,7 @@ pub fn attack_hit_sys(
 
 pub fn coward_sys(
     mut coward_query: Query<(&H1emuEntity, &Position), (With<Coward>, With<Alive>)>,
-    mut others_query: Query<&Position, (Without<Coward>, With<Alive>)>,
+    mut others_query: Query<&Position, (Without<Coward>, With<Alive>, Changed<Position>)>,
 ) {
     for (coward_ent, coward_pos) in &mut coward_query {
         for other_pos in &mut others_query {
@@ -125,7 +127,7 @@ pub fn coward_sys(
 
 pub fn trap_sys(
     mut trap_query: Query<(&Trap, &Position, &H1emuEntity, &mut Cooldown)>,
-    mut others_query: Query<(&Position, &H1emuEntity), (With<Alive>, With<PlayerEntity>)>,
+    mut others_query: Query<(&Position, &H1emuEntity), (With<Alive>, Changed<Position>)>,
 ) {
     for (ent, pos, h1emu_ent, mut cooldown) in &mut trap_query {
         if cooldown.is_in_cooldown() {
@@ -194,7 +196,7 @@ pub fn carnivore_eating_sys(
 }
 
 pub fn finish_eating_sys(
-    mut query: Query<(&H1emuEntity, Entity, &Eating, &mut HungerLevel), With<Alive>>,
+    mut query: Query<(&H1emuEntity, Entity, &Eating, &mut HungerLevel), (With<Alive>)>,
     mut commands: Commands,
 ) {
     let current_time = Utc::now().timestamp_millis();
