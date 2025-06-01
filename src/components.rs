@@ -70,11 +70,10 @@ impl H1emuEntity {
 
         Position { x, y, z }
     }
-    pub fn get_characterId(&self) -> String {
-        let js_value = CHARACTERID_KEY
+    pub fn get_characterId(&self) -> JsValue {
+        CHARACTERID_KEY
             .with(|key| self.get_property(&[key]))
-            .unwrap();
-        JsString::from(js_value).into()
+            .unwrap()
     }
     pub fn get_isAlive(&self) -> bool {
         let js_value = IS_ALIVE_KEY.with(|key| self.get_property(&[key])).unwrap();
@@ -151,12 +150,11 @@ pub struct Coward();
 #[derive(Component)]
 pub struct IsAttacking {
     pub target: Entity,
-    pub target_character_id: String,
     pub time_to_hit: i64,
 }
 
 #[derive(Component, Clone)]
-pub struct CharacterId(String);
+pub struct CharacterId(pub String);
 
 #[derive(Component, Default)]
 pub struct Alive();
@@ -201,10 +199,11 @@ pub struct WolfEntity();
 #[derive(Component)]
 pub struct BearEntity();
 
-#[derive(Bundle, Default)]
+#[derive(Bundle)]
 pub struct EntityDefaultBundle {
     pub h1emu_entity: H1emuEntity,
     pub position: Position,
+    pub character_id: CharacterId,
     pub alive: Alive,
 }
 #[derive(Bundle, Default)]

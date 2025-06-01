@@ -13,15 +13,6 @@ use crate::{
     ressources::HungerTimer,
 };
 
-pub fn track_positions(mut query: Query<(&H1emuEntity, &mut Position), (With<Alive>)>) {
-    for (entity, mut position) in &mut query {
-        let pos = entity.get_position();
-        if pos != *position {
-            *position = pos;
-        }
-    }
-}
-
 pub fn test_follow(
     mut zombie_query: Query<&H1emuEntity, With<ZombieEntity>>,
     mut player_query: Query<&H1emuEntity, With<PlayerEntity>>,
@@ -56,7 +47,7 @@ pub fn hostile_to_player_sys(
     >,
     mut all_positions_query: Query<
         (Entity, &Position, &H1emuEntity),
-        (With<PlayerEntity>, With<Alive>, Changed<Position>),
+        (With<PlayerEntity>, With<Alive>),
     >,
     mut commands: Commands,
 ) {
@@ -73,7 +64,6 @@ pub fn hostile_to_player_sys(
                 let current_time = Utc::now().timestamp_millis();
                 ec.insert(IsAttacking {
                     target: player_ent,
-                    target_character_id: player_h1emu_ent.get_characterId(),
                     time_to_hit: current_time + 1000_i64,
                 });
                 break;
@@ -83,7 +73,7 @@ pub fn hostile_to_player_sys(
 }
 pub fn attack_hit_sys(
     mut query: Query<(&IsAttacking, Entity, &H1emuEntity, &Position), With<Alive>>,
-    pos_query: Query<&Position, With<Alive>>,
+    pos_query: Query<(&Position, &CharacterId), With<Alive>>,
     mut commands: Commands,
 ) {
     let current_time = Utc::now().timestamp_millis();
@@ -93,10 +83,10 @@ pub fn attack_hit_sys(
         }
         let target_pos = pos_query.get(attack.target);
 
-        if let Ok(target_pos) = target_pos {
+        if let Ok((target_pos, charid)) = target_pos {
             if is_pos_in_radius(1.5, attacker_pos, target_pos) {
                 let args = js_sys::Array::new();
-                let character_id_jsvalue: JsValue = attack.target_character_id.clone().into();
+                let character_id_jsvalue: JsValue = charid.0.clone().into();
                 args.push(&character_id_jsvalue);
                 attacker_h1emu_ent.apply_damage(&args);
             }
@@ -124,7 +114,7 @@ pub fn coward_sys(
 
 pub fn trap_sys(
     mut trap_query: Query<(&Trap, &Position, &H1emuEntity, &mut Cooldown)>,
-    mut others_query: Query<(&Position, &H1emuEntity), (With<Alive>, Changed<Position>)>,
+    mut others_query: Query<(&Position, &CharacterId), (With<Alive>, Changed<Position>)>,
 ) {
     for (ent, pos, h1emu_ent, mut cooldown) in &mut trap_query {
         if cooldown.is_in_cooldown() {
@@ -132,7 +122,8 @@ pub fn trap_sys(
         }
         for (other_pos, other_h1emu_ent) in &mut others_query {
             if is_pos_in_radius(ent.0, &other_pos, &pos) {
-                let target_character_id = other_h1emu_ent.get_characterId();
+                // TODO: store characterId directly
+                let target_character_id = other_h1emu_ent.0.clone();
                 let args = js_sys::Array::new();
                 let character_id_jsvalue: JsValue = target_character_id.into();
                 args.push(&character_id_jsvalue);

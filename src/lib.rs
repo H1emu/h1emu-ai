@@ -1,4 +1,5 @@
 use std::{
+    default,
     ptr::read_unaligned,
     sync::{Arc, atomic::AtomicPtr},
 };
@@ -6,14 +7,14 @@ use std::{
 use bevy_ecs::prelude::*;
 use chrono::Utc;
 use components::{
-    BearEntity, Carnivore, Cooldown, Coward, DeerEntity, DefaultBundle, EntityDefaultBundle,
-    H1emuEntity, HostileToPlayer, HungerLevel, PlayerEntity, Trap, WolfEntity, ZombieEntity,
+    Alive, BearEntity, Carnivore, CharacterId, Cooldown, Coward, Dead, DeerEntity, DefaultBundle,
+    EntityDefaultBundle, H1emuEntity, HostileToPlayer, HungerLevel, PlayerEntity, Position, Trap,
+    WolfEntity, ZombieEntity,
 };
 use ressources::HungerTimer;
 use systems::{
-    attack_hit_sys, carnivore_eating_sys, check_aliveness_sys, check_player_revived_sys,
-    coward_sys, finish_eating_sys, hostile_to_player_sys, hunger_sys, hungry_sys,
-    remove_hungry_sys, test_follow, track_positions, trap_sys,
+    attack_hit_sys, carnivore_eating_sys, check_player_revived_sys, coward_sys, finish_eating_sys,
+    hostile_to_player_sys, hunger_sys, hungry_sys, remove_hungry_sys, test_follow, trap_sys,
 };
 use wasm_bindgen::prelude::*;
 
@@ -50,9 +51,6 @@ impl AiManager {
         let mut world = World::new();
         let mut schedule = Schedule::default();
         world.insert_resource(HungerTimer(Utc::now().timestamp_millis()));
-        schedule.add_systems(track_positions);
-        schedule.add_systems(check_aliveness_sys);
-        schedule.add_systems(check_player_revived_sys);
         schedule.add_systems(hungry_sys);
         schedule.add_systems(remove_hungry_sys);
         schedule.add_systems(hunger_sys);
@@ -76,15 +74,28 @@ impl AiManager {
     pub fn run(&mut self) {
         self.schedule.run(&mut self.world);
     }
+    pub fn update_pos(&mut self, entity_id: u64, position: Vec<f32>) {
+        let e = Entity::from_bits(entity_id);
+
+        let mut position_component = self.world.get_mut::<Position>(e).unwrap();
+        position_component.x = position[0];
+        position_component.y = position[1];
+        position_component.z = position[2];
+    }
     pub fn add_entity(&mut self, e: js_sys::Object, entity_type: EntityType) -> u64 {
         let h1emu_entity = Box::into_raw(Box::new(e));
         let h1emu_entity_ptr = Arc::new(AtomicPtr::new(h1emu_entity));
         let h1emu_entity_component = H1emuEntity(h1emu_entity_ptr);
         let position = h1emu_entity_component.get_position();
+        let charid = h1emu_entity_component
+            .get_characterId()
+            .as_string()
+            .unwrap();
         let mut entity = self.world.spawn(EntityDefaultBundle {
             h1emu_entity: h1emu_entity_component,
             position,
-            ..Default::default()
+            character_id: CharacterId(charid),
+            alive: Alive(),
         });
         match entity_type {
             EntityType::Player => entity.insert(PlayerEntity {}),
@@ -100,6 +111,16 @@ impl AiManager {
             EntityType::Deer => entity.insert((DeerEntity {}, Coward {})),
         };
         entity.id().to_bits()
+    }
+    pub fn entity_dead(&mut self, entity_id: u64) {
+        let e = Entity::from_bits(entity_id);
+        self.world.entity_mut(e).remove::<Alive>();
+        self.world.entity_mut(e).insert(Dead());
+    }
+    pub fn entity_alive(&mut self, entity_id: u64) {
+        let e = Entity::from_bits(entity_id);
+        self.world.entity_mut(e).remove::<Dead>();
+        self.world.entity_mut(e).insert(Alive());
     }
     pub fn remove_entity(&mut self, entity_id_bits: u64) {
         let e = Entity::from_bits(entity_id_bits);
