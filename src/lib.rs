@@ -1,6 +1,6 @@
 use std::{
     ptr::read_unaligned,
-    sync::{atomic::AtomicPtr, Arc},
+    sync::{Arc, atomic::AtomicPtr},
 };
 
 use bevy_ecs::prelude::*;
@@ -63,6 +63,7 @@ impl AiManager {
         schedule.add_systems(coward_sys);
         schedule.add_systems(trap_sys);
 
+        log!("h1emu-ai in debug mode");
         AiManager { world, schedule }
     }
 
