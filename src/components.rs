@@ -1,8 +1,8 @@
 use std::{
     default,
     sync::{
-        atomic::{AtomicPtr, Ordering},
         Arc,
+        atomic::{AtomicPtr, Ordering},
     },
 };
 
@@ -121,12 +121,23 @@ impl H1emuEntity {
         self.call_method(method, args);
     }
     fn call_method(&self, method: &JsValue, args: &Array) {
-        let obj = self.get_object().unwrap();
-        let func: Function = Function::from(Reflect::get(obj, method).unwrap());
-        if func.is_function() {
-            func.apply(obj, args).unwrap();
+        if let Ok(obj) = self.get_object() {
+            if let Ok(reflect_value) = Reflect::get(obj, method) {
+                let func: Function = Function::from(reflect_value);
+                if func.is_function() {
+                    let result = func.apply(obj, args);
+                    if result.is_err() {
+                        log!(format!("{:?}", result.unwrap_err()));
+                    }
+                } else {
+                    log!("specified method doesn't exist");
+                }
+            } else {
+                log!("reflected value doesn't exist");
+                log!(format!("{:?}", Reflect::get(obj, method).unwrap_err()));
+            }
         } else {
-            log!("specified method doesn't exist");
+            log!("Object doesn't exist");
         }
     }
 }
