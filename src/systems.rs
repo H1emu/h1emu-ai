@@ -17,7 +17,6 @@ pub fn track_positions(mut query: Query<(&H1emuEntity, &mut Position), (With<Ali
     for (entity, mut position) in &mut query {
         let pos = entity.get_position();
         if pos != position.to_owned() {
-            log!("new pos");
             position.x = pos.x;
             position.y = pos.y;
             position.z = pos.z;
