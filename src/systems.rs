@@ -16,10 +16,8 @@ use crate::{
 pub fn track_positions(mut query: Query<(&H1emuEntity, &mut Position), (With<Alive>)>) {
     for (entity, mut position) in &mut query {
         let pos = entity.get_position();
-        if pos != position.to_owned() {
-            position.x = pos.x;
-            position.y = pos.y;
-            position.z = pos.z;
+        if pos != *position {
+            *position = pos;
         }
     }
 }

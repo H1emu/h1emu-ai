@@ -9,6 +9,7 @@ use std::{
 use bevy_ecs::prelude::*;
 use chrono::Utc;
 use js_sys::{Array, Boolean, Float32Array, Function, JsString, Object, Reflect};
+use once_cell::unsync::Lazy;
 use wasm_bindgen::JsValue;
 
 use crate::{error, log};
@@ -26,12 +27,18 @@ const BINDINGS: Bindings = Bindings {
     detonate: "detonate",
 };
 
+thread_local! {
+    static IS_ALIVE_KEY: Lazy<JsValue> = Lazy::new(|| JsValue::from_str("isAlive"));
+    static POSITION_KEY: Lazy<JsValue> = Lazy::new(|| JsValue::from_str("position"));
+    static STATE_KEY: Lazy<JsValue> = Lazy::new(|| JsValue::from_str("state"));
+    static CHARACTERID_KEY: Lazy<JsValue> = Lazy::new(|| JsValue::from_str("characterId"));
+}
 #[derive(Component, Default)]
 pub struct H1emuEntity(pub Arc<AtomicPtr<js_sys::Object>>);
 impl H1emuEntity {
     pub fn get_object(&self) -> Result<&Object, ()> {
         // Load the raw pointer
-        let ptr = self.0.load(Ordering::SeqCst);
+        let ptr = self.0.load(Ordering::Acquire);
 
         // Check if the pointer is null
         if !ptr.is_null() {
@@ -52,57 +59,44 @@ impl H1emuEntity {
         }
     }
     pub fn get_position(&self) -> Position {
-        let position_js_value = self
-            .get_property(vec![
-                &JsValue::from_str("state"),
-                &JsValue::from_str("position"),
-            ])
+        let position_js_value = STATE_KEY
+            .with(|state_key| POSITION_KEY.with(|pos_key| self.get_property(&[state_key, pos_key])))
             .unwrap();
-
         let float32_array = Float32Array::from(position_js_value);
 
-        let vec = float32_array.to_vec();
+        let x = float32_array.get_index(0);
+        let y = float32_array.get_index(1);
+        let z = float32_array.get_index(2);
 
-        Position {
-            x: vec[0],
-            y: vec[1],
-            z: vec[2],
-        }
+        Position { x, y, z }
     }
     pub fn get_characterId(&self) -> String {
-        let js_value = self
-            .get_property(vec![&JsValue::from_str("characterId")])
+        let js_value = CHARACTERID_KEY
+            .with(|key| self.get_property(&[key]))
             .unwrap();
-
         JsString::from(js_value).into()
     }
     pub fn get_isAlive(&self) -> bool {
-        let js_value = self
-            .get_property(vec![&JsValue::from_str("isAlive")])
-            .unwrap();
-
-        js_sys::Boolean::from(js_value).into()
+        let js_value = IS_ALIVE_KEY.with(|key| self.get_property(&[key])).unwrap();
+        js_value.is_truthy()
     }
-    fn get_property(&self, property_chain: Vec<&JsValue>) -> Result<JsValue, ()> {
-        let mut current_obj = self.get_object().unwrap().to_owned();
-        for property_name in property_chain {
-            let property = Reflect::get(&current_obj, property_name).unwrap();
-            if property.is_undefined() {
-                error!(format!(
-                    "specified property {:?} doesn't exist",
-                    property_name
-                ));
-                break;
-                // Err(())
-            } else {
-                current_obj = Object::from(property);
+    fn get_property(&self, property_chain: &[&JsValue]) -> Result<JsValue, ()> {
+        let mut current = match self.get_object() {
+            Ok(obj) => JsValue::from(obj),
+            _ => return Err(()),
+        };
+
+        for &prop in property_chain {
+            let next = Reflect::get(&current, prop).map_err(|_| ())?;
+
+            if next.is_undefined() {
+                return Err(());
             }
+
+            current = next;
         }
-        if !current_obj.is_undefined() {
-            Ok(JsValue::from(current_obj))
-        } else {
-            Err(())
-        }
+
+        Ok(current)
     }
     pub fn play_animation(&self, args: &Array) {
         let method = &JsValue::from_str(BINDINGS.play_animation);
