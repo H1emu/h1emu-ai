@@ -51,15 +51,21 @@ impl AiManager {
         let mut world = World::new();
         let mut schedule = Schedule::default();
         world.insert_resource(HungerTimer(Utc::now().timestamp_millis()));
-        schedule.add_systems(hungry_sys);
-        schedule.add_systems(remove_hungry_sys);
-        schedule.add_systems(hunger_sys);
-        schedule.add_systems(hostile_to_player_sys);
-        schedule.add_systems(attack_hit_sys);
-        schedule.add_systems(carnivore_eating_sys);
-        schedule.add_systems(finish_eating_sys);
-        schedule.add_systems(coward_sys);
-        schedule.add_systems(trap_sys);
+        #[cfg(feature = "zombies")]
+        {
+            schedule.add_systems(hungry_sys);
+            schedule.add_systems(remove_hungry_sys);
+            schedule.add_systems(hunger_sys);
+            schedule.add_systems(hostile_to_player_sys);
+            schedule.add_systems(attack_hit_sys);
+            schedule.add_systems(carnivore_eating_sys);
+            schedule.add_systems(finish_eating_sys);
+            schedule.add_systems(coward_sys);
+        }
+        #[cfg(feature = "traps")]
+        {
+            schedule.add_systems(trap_sys);
+        }
 
         log!("h1emu-ai in debug mode");
         AiManager { world, schedule }
