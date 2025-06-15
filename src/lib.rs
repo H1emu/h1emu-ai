@@ -4,6 +4,10 @@ use std::{
     sync::{Arc, atomic::AtomicPtr},
 };
 
+use crate::systems::{
+    attack_hit_sys, carnivore_eating_sys, check_player_revived_sys, coward_sys, finish_eating_sys,
+    hostile_to_player_sys, hunger_sys, hungry_sys, remove_hungry_sys, test_follow, trap_sys,
+};
 use bevy_ecs::prelude::*;
 use chrono::Utc;
 use components::{
@@ -12,10 +16,6 @@ use components::{
     WolfEntity, ZombieEntity,
 };
 use ressources::HungerTimer;
-use systems::{
-    attack_hit_sys, carnivore_eating_sys, check_player_revived_sys, coward_sys, finish_eating_sys,
-    hostile_to_player_sys, hunger_sys, hungry_sys, remove_hungry_sys, test_follow, trap_sys,
-};
 use wasm_bindgen::prelude::*;
 
 mod components;

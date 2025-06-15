@@ -11,6 +11,7 @@ use crate::{
     },
     error, log,
     ressources::HungerTimer,
+    systems::common::is_pos_in_radius,
 };
 
 pub fn test_follow(
@@ -32,14 +33,7 @@ pub fn test_follow(
         }
     }
 }
-pub fn is_pos_in_radius(radius: f32, player_pos: &Position, enemi_pos: &Position) -> bool {
-    let player_x = player_pos.x;
-    let player_z = player_pos.z;
-    let enemi_x = enemi_pos.x;
-    let enemi_z = enemi_pos.z;
-    (player_x - radius <= enemi_x && enemi_x <= player_x + radius)
-        && (player_z - radius <= enemi_z && enemi_z <= player_z + radius)
-}
+
 pub fn hostile_to_player_sys(
     mut hostile_query: Query<
         (&H1emuEntity, &Position, Entity),
@@ -106,29 +100,6 @@ pub fn coward_sys(
         for other_pos in &mut others_query {
             if is_pos_in_radius(2.0, &other_pos, &coward_pos) {
                 log!("i'm afraid");
-                break;
-            }
-        }
-    }
-}
-
-pub fn trap_sys(
-    mut trap_query: Query<(&Trap, &Position, &H1emuEntity, &mut Cooldown)>,
-    mut others_query: Query<(&Position, &CharacterId), (With<Alive>, Changed<Position>)>,
-) {
-    for (ent, pos, h1emu_ent, mut cooldown) in &mut trap_query {
-        if cooldown.is_in_cooldown() {
-            continue;
-        }
-        for (other_pos, other_h1emu_ent) in &mut others_query {
-            if is_pos_in_radius(ent.0, &other_pos, &pos) {
-                // TODO: store characterId directly
-                let target_character_id = other_h1emu_ent.0.clone();
-                let args = js_sys::Array::new();
-                let character_id_jsvalue: JsValue = target_character_id.into();
-                args.push(&character_id_jsvalue);
-                cooldown.last = Utc::now().timestamp_millis();
-                h1emu_ent.detonate(&args);
                 break;
             }
         }
