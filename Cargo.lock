@@ -414,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "h1emu-ai"
-version = "0.0.12"
+version = "0.1.0"
 dependencies = [
  "bevy_ecs",
  "chrono",
