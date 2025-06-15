@@ -1,12 +1,22 @@
-use std::sync::{Arc, atomic::AtomicPtr};
+use std::{
+    default,
+    i64::MAX,
+    sync::{Arc, atomic::AtomicPtr},
+};
 
-use crate::systems::trap_sys;
+use crate::{
+    components::DespawnCooldown,
+    systems::{
+        attack_hit_sys, carnivore_eating_sys, coward_sys, despawn_inactive, finish_eating_sys,
+        hostile_to_player_sys, hunger_sys, hungry_sys, remove_hungry_sys, trap_sys,
+    },
+};
 use bevy_ecs::prelude::*;
 use chrono::Utc;
 use components::{
-    Alive, BearEntity, Carnivore, CharacterId, Cooldown, Coward, Dead, DeerEntity, DefaultBundle,
+    Alive, BearEntity, Carnivore, CharacterId, Coward, Dead, DeerEntity, DefaultBundle,
     EntityDefaultBundle, H1emuEntity, HostileToPlayer, HungerLevel, PlayerEntity, Position, Trap,
-    WolfEntity, ZombieEntity,
+    TrapsCooldown, WolfEntity, ZombieEntity,
 };
 use ressources::HungerTimer;
 use wasm_bindgen::prelude::*;
@@ -40,12 +50,11 @@ pub struct AiManager {
 #[wasm_bindgen]
 impl AiManager {
     #[wasm_bindgen(constructor)]
-    pub fn initialize() -> AiManager {
+    pub fn initialize(allow_zombies: Option<bool>) -> AiManager {
         let mut world = World::new();
         let mut schedule = Schedule::default();
         world.insert_resource(HungerTimer(Utc::now().timestamp_millis()));
-        #[cfg(feature = "zombies")]
-        {
+        if allow_zombies.is_some() && allow_zombies.unwrap() {
             schedule.add_systems(hungry_sys);
             schedule.add_systems(remove_hungry_sys);
             schedule.add_systems(hunger_sys);
@@ -55,10 +64,8 @@ impl AiManager {
             schedule.add_systems(finish_eating_sys);
             schedule.add_systems(coward_sys);
         }
-        #[cfg(feature = "traps")]
-        {
-            schedule.add_systems(trap_sys);
-        }
+        schedule.add_systems(trap_sys);
+        schedule.add_systems(despawn_inactive);
 
         log!("h1emu-ai in debug mode");
         AiManager { world, schedule }
@@ -125,7 +132,13 @@ impl AiManager {
         let e = Entity::from_bits(entity_id_bits);
         self.world.despawn(e);
     }
-    pub fn add_trap(&mut self, e: js_sys::Object, radius: f32, cooldown: i64) -> u64 {
+    pub fn add_trap(
+        &mut self,
+        e: js_sys::Object,
+        radius: f32,
+        trigger_cooldown: i64,
+        despawn_cooldown: Option<i64>,
+    ) -> u64 {
         let h1emu_entity = Box::into_raw(Box::new(e));
         let h1emu_entity_ptr = Arc::new(AtomicPtr::new(h1emu_entity));
         let h1emu_entity_component = H1emuEntity(h1emu_entity_ptr);
@@ -133,13 +146,16 @@ impl AiManager {
         let mut entity = self.world.spawn(DefaultBundle {
             h1emu_entity: h1emu_entity_component,
             position,
-            ..Default::default()
         });
         entity.insert(Trap(radius));
-        entity.insert(Cooldown {
-            cooldown,
+        entity.insert(TrapsCooldown {
+            cooldown: trigger_cooldown,
             ..Default::default()
         });
+        if let Some(despawn_cooldown) = despawn_cooldown {
+            log!("spawned with cooldown");
+            entity.insert(DespawnCooldown::new(despawn_cooldown));
+        }
         entity.id().to_bits()
     }
 }

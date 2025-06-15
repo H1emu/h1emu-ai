@@ -1,7 +1,7 @@
 use std::sync::{
-        Arc,
-        atomic::{AtomicPtr, Ordering},
-    };
+    Arc,
+    atomic::{AtomicPtr, Ordering},
+};
 
 use bevy_ecs::prelude::*;
 use chrono::Utc;
@@ -16,12 +16,14 @@ pub struct Bindings {
     pub apply_damage: &'static str,
     pub play_animation: &'static str,
     pub detonate: &'static str,
+    pub destroy: &'static str,
 }
 const BINDINGS: Bindings = Bindings {
     go_to: "goTo",
     apply_damage: "applyDamage",
     play_animation: "playAnimation",
     detonate: "detonate",
+    destroy: "destroy",
 };
 
 thread_local! {
@@ -29,6 +31,7 @@ thread_local! {
     static POSITION_KEY: Lazy<JsValue> = Lazy::new(|| JsValue::from_str("position"));
     static STATE_KEY: Lazy<JsValue> = Lazy::new(|| JsValue::from_str("state"));
     static CHARACTERID_KEY: Lazy<JsValue> = Lazy::new(|| JsValue::from_str("characterId"));
+    static DESTROY_KEY: Lazy<JsValue> = Lazy::new(|| JsValue::from_str("destroy"));
 }
 #[derive(Component, Default)]
 pub struct H1emuEntity(pub Arc<AtomicPtr<js_sys::Object>>);
@@ -102,6 +105,10 @@ impl H1emuEntity {
         let method = &JsValue::from_str(BINDINGS.detonate);
         self.call_method(method, args);
     }
+    pub fn destroy(&self) {
+        let args = js_sys::Array::new();
+        DESTROY_KEY.with(|key| self.call_method(&key, &args))
+    }
     pub fn go_to(&self, args: &Array) {
         let method = &JsValue::from_str(BINDINGS.go_to);
         self.call_method(method, args);
@@ -171,14 +178,37 @@ pub struct Carnivore();
 #[derive(Component)]
 pub struct Trap(pub f32);
 #[derive(Component, Default)]
-pub struct Cooldown {
-    pub last: i64,
+pub struct TrapsCooldown {
+    pub last_trigger: i64,
     pub cooldown: i64,
 }
-impl Cooldown {
+impl TrapsCooldown {
     pub fn is_in_cooldown(&self) -> bool {
         let current_time = Utc::now().timestamp_millis();
-        current_time < self.last + self.cooldown
+        current_time < self.last_trigger + self.cooldown
+    }
+}
+#[derive(Component, Default)]
+pub struct DespawnCooldown {
+    last_activity: i64,
+    cooldown: i64,
+}
+impl DespawnCooldown {
+    pub fn new(cooldown: i64) -> Self {
+        let current_time = Utc::now().timestamp_millis();
+        log!(format!("new cooldown of {}", cooldown));
+        DespawnCooldown {
+            cooldown,
+            last_activity: current_time,
+        }
+    }
+    pub fn has_expired(&self) -> bool {
+        let current_time = Utc::now().timestamp_millis();
+        current_time > self.last_activity + self.cooldown
+    }
+    pub fn register_activity(&mut self) {
+        let current_time = Utc::now().timestamp_millis();
+        self.last_activity = current_time;
     }
 }
 #[derive(Component)]
