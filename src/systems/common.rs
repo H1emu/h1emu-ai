@@ -1,17 +1,5 @@
-use bevy_ecs::prelude::*;
-use chrono::Utc;
-use js_sys::{Float32Array, Math::log};
-use wasm_bindgen::JsValue;
 
-use crate::{
-    components::{
-        Alive, Carnivore, CharacterId, Cooldown, Coward, Dead, Eating, H1emuEntity,
-        HostileToPlayer, HungerLevel, Hungry, IsAttacking, PlayerEntity, Position, Trap,
-        ZombieEntity,
-    },
-    error, log,
-    ressources::HungerTimer,
-};
+use crate::components::Position;
 
 pub fn is_pos_in_radius(radius: f32, player_pos: &Position, enemi_pos: &Position) -> bool {
     let player_x = player_pos.x;

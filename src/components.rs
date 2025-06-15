@@ -1,18 +1,15 @@
-use std::{
-    default,
-    sync::{
+use std::sync::{
         Arc,
         atomic::{AtomicPtr, Ordering},
-    },
-};
+    };
 
 use bevy_ecs::prelude::*;
 use chrono::Utc;
-use js_sys::{Array, Boolean, Float32Array, Function, JsString, Object, Reflect};
+use js_sys::{Array, Float32Array, Function, Object, Reflect};
 use once_cell::unsync::Lazy;
 use wasm_bindgen::JsValue;
 
-use crate::{error, log};
+use crate::log;
 
 pub struct Bindings {
     pub go_to: &'static str,
@@ -181,11 +178,7 @@ pub struct Cooldown {
 impl Cooldown {
     pub fn is_in_cooldown(&self) -> bool {
         let current_time = Utc::now().timestamp_millis();
-        if current_time < self.last + self.cooldown {
-            true
-        } else {
-            false
-        }
+        current_time < self.last + self.cooldown
     }
 }
 #[derive(Component)]

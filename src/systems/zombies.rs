@@ -1,15 +1,14 @@
 use bevy_ecs::prelude::*;
 use chrono::Utc;
-use js_sys::{Float32Array, Math::log};
+use js_sys::Float32Array;
 use wasm_bindgen::JsValue;
 
 use crate::{
     components::{
-        Alive, Carnivore, CharacterId, Cooldown, Coward, Dead, Eating, H1emuEntity,
-        HostileToPlayer, HungerLevel, Hungry, IsAttacking, PlayerEntity, Position, Trap,
+        Alive, Carnivore, CharacterId, Coward, Dead, Eating, H1emuEntity,
+        HostileToPlayer, HungerLevel, Hungry, IsAttacking, PlayerEntity, Position,
         ZombieEntity,
-    },
-    error, log,
+    }, log,
     ressources::HungerTimer,
     systems::common::is_pos_in_radius,
 };
@@ -48,7 +47,7 @@ pub fn hostile_to_player_sys(
     for (hostile_h1emu_ent, hostile_pos, hostile_ent) in &mut hostile_query {
         for (player_ent, player_pos, player_h1emu_ent) in &mut all_positions_query {
             // let hostile_pos = hostile_ent.get_position();
-            if is_pos_in_radius(1.5, &player_pos, &hostile_pos) {
+            if is_pos_in_radius(1.5, player_pos, hostile_pos) {
                 // Just a quick test nothing fancy but even with 800 entities this run taking only
                 // a microsec probably even less that's crazy
                 let args = js_sys::Array::new();
@@ -98,7 +97,7 @@ pub fn coward_sys(
 ) {
     for (coward_ent, coward_pos) in &mut coward_query {
         for other_pos in &mut others_query {
-            if is_pos_in_radius(2.0, &other_pos, &coward_pos) {
+            if is_pos_in_radius(2.0, other_pos, coward_pos) {
                 log!("i'm afraid");
                 break;
             }
@@ -155,7 +154,7 @@ pub fn carnivore_eating_sys(
 }
 
 pub fn finish_eating_sys(
-    mut query: Query<(&H1emuEntity, Entity, &Eating, &mut HungerLevel), (With<Alive>)>,
+    mut query: Query<(&H1emuEntity, Entity, &Eating, &mut HungerLevel), With<Alive>>,
     mut commands: Commands,
 ) {
     let current_time = Utc::now().timestamp_millis();
@@ -189,14 +188,14 @@ pub fn remove_hungry_sys(
     }
 }
 pub fn hunger_sys(
-    mut query: Query<&mut HungerLevel, (With<Alive>)>,
+    mut query: Query<&mut HungerLevel, With<Alive>>,
     mut hunger_timer: ResMut<HungerTimer>,
 ) {
     let current_time = Utc::now().timestamp_millis();
     if hunger_timer.0 <= current_time {
         for mut hunger_level in &mut query {
             if hunger_level.0 > 0 {
-                hunger_level.0 = hunger_level.0 - 1;
+                hunger_level.0 -= 1;
             }
         }
         hunger_timer.0 = current_time + 10_000;

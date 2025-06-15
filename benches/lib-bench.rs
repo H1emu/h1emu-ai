@@ -1,9 +1,9 @@
 use components::Position;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 #[path = "../src/components.rs"]
 mod components;
-#[path = "../src/systems.rs"]
+#[path = "../src/systems/mod.rs"]
 mod systems;
 use h1emu_ai::*;
 

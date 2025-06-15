@@ -1,16 +1,11 @@
 use bevy_ecs::prelude::*;
 use chrono::Utc;
-use js_sys::{Float32Array, Math::log};
 use wasm_bindgen::JsValue;
 
 use crate::{
     components::{
-        Alive, Carnivore, CharacterId, Cooldown, Coward, Dead, Eating, H1emuEntity,
-        HostileToPlayer, HungerLevel, Hungry, IsAttacking, PlayerEntity, Position, Trap,
-        ZombieEntity,
+        Alive, CharacterId, Cooldown, H1emuEntity, Position, Trap,
     },
-    error, log,
-    ressources::HungerTimer,
     systems::common::is_pos_in_radius,
 };
 
@@ -23,7 +18,7 @@ pub fn trap_sys(
             continue;
         }
         for (other_pos, other_h1emu_ent) in &mut others_query {
-            if is_pos_in_radius(ent.0, &other_pos, &pos) {
+            if is_pos_in_radius(ent.0, other_pos, pos) {
                 // TODO: store characterId directly
                 let target_character_id = other_h1emu_ent.0.clone();
                 let args = js_sys::Array::new();
