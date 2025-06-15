@@ -107,7 +107,7 @@ impl H1emuEntity {
     }
     pub fn destroy(&self) {
         let args = js_sys::Array::new();
-        DESTROY_KEY.with(|key| self.call_method(&key, &args))
+        DESTROY_KEY.with(|key| self.call_method(key, &args))
     }
     pub fn go_to(&self, args: &Array) {
         let method = &JsValue::from_str(BINDINGS.go_to);

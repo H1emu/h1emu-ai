@@ -1,8 +1,4 @@
-use std::{
-    default,
-    i64::MAX,
-    sync::{Arc, atomic::AtomicPtr},
-};
+use std::sync::{Arc, atomic::AtomicPtr};
 
 use crate::{
     components::DespawnCooldown,
